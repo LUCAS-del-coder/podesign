@@ -250,21 +250,31 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
         title: title,
       };
     } catch (error: any) {
-      console.error(`[YouTube] yt-dlp 下載失敗:`, error);
+      console.error(`[YouTube] 處理失敗:`, error);
       
-      // 提供友善的錯誤訊息
+      // 檢查是否是 storage 相關錯誤（不應該被誤判為 YouTube 下載錯誤）
+      if (error.message?.includes('Storage') || error.message?.includes('storage') || error.message?.includes('BUILT_IN_FORGE')) {
+        throw new Error(`檔案上傳失敗：${error.message}。請檢查 Storage 配置（BUILT_IN_FORGE_API_URL 和 BUILT_IN_FORGE_API_KEY）`);
+      }
+      
+      // 提供友善的錯誤訊息（僅針對 YouTube 下載相關錯誤）
       let errorMessage = 'YouTube 影片下載失敗';
-      if (error.message?.includes('Private video') || error.stderr?.includes('Private video')) {
+      const errorMsg = error.message || '';
+      const errorStderr = error.stderr || '';
+      
+      if (errorMsg.includes('Private video') || errorStderr.includes('Private video')) {
         errorMessage = '此影片為私人影片，無法下載';
-      } else if (error.message?.includes('unavailable') || error.stderr?.includes('unavailable')) {
+      } else if (errorMsg.includes('unavailable') || errorStderr.includes('unavailable')) {
         errorMessage = '影片不存在或不可用';
-      } else if (error.message?.includes('age') || error.stderr?.includes('age')) {
+      } else if ((errorMsg.includes('age') || errorStderr.includes('age')) && 
+                 !errorMsg.includes('Storage') && !errorMsg.includes('storage')) {
+        // 只有在不是 storage 錯誤時才判斷為年齡限制
         errorMessage = '此影片有年齡限制，無法下載';
-      } else if (error.message?.includes('region') || error.stderr?.includes('region')) {
+      } else if (errorMsg.includes('region') || errorStderr.includes('region')) {
         errorMessage = '影片在您的國家/地區不可用';
-      } else if (error.message?.includes('403') || error.stderr?.includes('403')) {
+      } else if (errorMsg.includes('403') || errorStderr.includes('403')) {
         errorMessage = 'YouTube 暫時限制存取，請稍後重試';
-      } else if (error.message?.includes('timeout')) {
+      } else if (errorMsg.includes('timeout')) {
         errorMessage = '下載超時。影片可能過長或網路連線不穩定，請稍後重試';
       }
       
