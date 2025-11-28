@@ -1,10 +1,9 @@
 /**
  * YouTube 影片處理服務
- * 使用 youtube-dl-exec（yt-dlp 的 Node.js 包裝器）下載 YouTube 音訊
+ * 直接使用 yt-dlp 二進位檔下載 YouTube 音訊（更可靠的方式）
  * 並使用內建的 transcribeAudio API 進行轉錄
  */
 
-import youtubeDlExec from "youtube-dl-exec";
 import { transcribeAudio } from "./_core/voiceTranscription";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
@@ -12,6 +11,10 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
+import { execFile } from "child_process";
+import { promisify } from "util";
+
+const execFileAsync = promisify(execFile);
 
 /**
  * 從 YouTube URL 提取影片 ID
@@ -66,39 +69,32 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
   try {
     console.log(`[YouTube] 開始下載音訊: ${youtubeUrl}`);
 
-    // 使用 youtube-dl-exec (yt-dlp) 下載音訊
-    // 這會自動下載 yt-dlp 二進位檔（如果還沒有）
+    // 直接使用 yt-dlp 二進位檔下載音訊（更可靠的方式）
     try {
       console.log(`[YouTube] 使用 yt-dlp 下載音訊...`);
       
-      // 先獲取影片資訊（使用 dumpSingleJson 選項）
+      // 先獲取影片資訊
       let videoInfo: any = {};
       let title = 'Unknown';
       let duration = 0;
       
       try {
-        // 使用 dumpSingleJson 獲取單一影片的 JSON 資訊
-        const infoResult = await youtubeDlExec(youtubeUrl, {
-          dumpSingleJson: true,
-          noWarnings: true,
-          noCallHome: true,
-          noCheckCertificate: true,
-          preferFreeFormats: true,
-        });
+        console.log(`[YouTube] 獲取影片資訊...`);
+        const { stdout: infoStdout } = await execFileAsync('yt-dlp', [
+          '--dump-json',
+          '--no-warnings',
+          '--no-call-home',
+          '--no-check-certificate',
+          youtubeUrl,
+        ], { maxBuffer: 1024 * 1024 * 10 });
         
-        // youtube-dl-exec 可能返回字串或物件
-        if (typeof infoResult === 'string') {
-          try {
-            videoInfo = JSON.parse(infoResult);
-          } catch (parseError) {
-            console.warn(`[YouTube] JSON 解析失敗:`, parseError);
-          }
-        } else if (infoResult && typeof infoResult === 'object') {
-          videoInfo = infoResult;
+        try {
+          videoInfo = JSON.parse(infoStdout);
+          title = videoInfo.title || 'Unknown';
+          duration = videoInfo.duration || 0;
+        } catch (parseError) {
+          console.warn(`[YouTube] JSON 解析失敗:`, parseError);
         }
-        
-        title = videoInfo.title || 'Unknown';
-        duration = videoInfo.duration || 0;
       } catch (error: any) {
         console.warn(`[YouTube] 獲取影片資訊失敗，繼續下載:`, error.message || error);
         // 繼續下載，即使獲取資訊失敗
@@ -107,35 +103,38 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
       console.log(`[YouTube] 影片標題: ${title}`);
       console.log(`[YouTube] 影片長度: ${duration} 秒`);
 
-      // 下載音訊（使用 yt-dlp 的最佳音訊格式）
+      // 下載音訊並直接轉換為 MP3（使用 --extract-audio --audio-format mp3）
       console.log(`[YouTube] 開始下載音訊...`);
-      // 使用 videoId 作為檔案名稱，讓 yt-dlp 自動決定副檔名
-      const outputTemplate = path.join(tempDir, `${videoId}.%(ext)s`);
+      const outputPath = path.join(tempDir, `${videoId}.mp3`);
       
-      console.log(`[YouTube] 輸出模板: ${outputTemplate}`);
+      console.log(`[YouTube] 輸出路徑: ${outputPath}`);
       console.log(`[YouTube] 臨時目錄: ${tempDir}`);
       
       try {
-        // 使用 yt-dlp 的格式選項下載最佳音訊
-        // 直接下載音訊格式，然後手動轉換為 MP3（如果需要）
+        // 使用 yt-dlp 直接提取音訊並轉換為 MP3
+        // 這是更可靠的方式，避免格式轉換問題
         console.log(`[YouTube] 執行 yt-dlp 下載命令...`);
-        const result = await youtubeDlExec(youtubeUrl, {
-          format: 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
-          output: outputTemplate,
-          noWarnings: true,
-          noCallHome: true,
-          noCheckCertificate: true,
-          preferFreeFormats: true,
+        const { stdout, stderr } = await execFileAsync('yt-dlp', [
+          '--extract-audio',
+          '--audio-format', 'mp3',
+          '--audio-quality', '0', // 最佳品質
+          '--output', outputPath,
+          '--no-warnings',
+          '--no-call-home',
+          '--no-check-certificate',
+          youtubeUrl,
+        ], { 
+          maxBuffer: 1024 * 1024 * 50, // 50MB buffer for large outputs
+          timeout: 600000, // 10 分鐘超時
         });
         
-        console.log(`[YouTube] yt-dlp 執行完成，結果:`, result);
+        console.log(`[YouTube] yt-dlp 執行完成`);
+        if (stdout) console.log(`[YouTube] yt-dlp stdout:`, stdout.substring(0, 500));
+        if (stderr) console.log(`[YouTube] yt-dlp stderr:`, stderr.substring(0, 500));
       } catch (downloadError: any) {
         // 詳細記錄錯誤資訊
         console.error(`[YouTube] yt-dlp 下載錯誤:`, downloadError.message || downloadError);
         console.error(`[YouTube] 錯誤類型:`, downloadError.constructor?.name);
-        console.error(`[YouTube] 錯誤堆疊:`, downloadError.stack);
-        
-        // 檢查錯誤的 stdout 和 stderr
         if (downloadError.stdout) {
           console.error(`[YouTube] yt-dlp stdout:`, downloadError.stdout);
         }
@@ -156,8 +155,8 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
           if (errorMessage.includes('403') || errorStderr.includes('403')) {
             throw new Error('YouTube 暫時限制存取（403），請稍後重試或嘗試其他影片');
           }
-          if (errorMessage.includes('yt-dlp') || errorMessage.includes('not found')) {
-            throw new Error('yt-dlp 無法執行。請檢查 Railway 環境是否支援執行外部二進位檔');
+          if (errorMessage.includes('yt-dlp') || errorMessage.includes('not found') || errorMessage.includes('ENOENT')) {
+            throw new Error('yt-dlp 無法執行。請檢查 Railway 環境是否正確安裝了 yt-dlp');
           }
           
           // 提供更詳細的錯誤訊息
@@ -166,68 +165,52 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
       }
 
       // 等待一下確保檔案寫入完成
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // 查找下載的檔案（可能是 .m4a, .webm, .opus 等）
-      const files = await fs.readdir(tempDir);
-      console.log(`[YouTube] 臨時目錄中的所有檔案:`, files);
+      // 檢查下載的 MP3 檔案是否存在
+      console.log(`[YouTube] 檢查下載的檔案: ${outputPath}`);
       
-      // 查找音訊檔案（不一定要以 videoId 開頭，因為 yt-dlp 可能使用不同的命名）
-      const audioFile = files.find(f => 
-        (f.endsWith('.m4a') || f.endsWith('.webm') || f.endsWith('.opus') || f.endsWith('.mp3') || f.endsWith('.ogg')) &&
-        !f.endsWith('.part') && // 排除未完成的下載
-        !f.endsWith('.ytdl') // 排除 yt-dlp 的臨時檔案
-      );
-      
-      if (!audioFile) {
-        console.error(`[YouTube] 找不到音訊檔案。目錄內容:`, files);
-        throw new Error('下載完成但找不到音訊檔案。請檢查日誌或稍後重試');
-      }
-      
-      console.log(`[YouTube] 找到音訊檔案: ${audioFile}`);
-
-      const downloadedPath = path.join(tempDir, audioFile);
-      console.log(`[YouTube] 下載的檔案路徑: ${downloadedPath}`);
-      
-      // 檢查檔案是否存在
       try {
-        const stats = await fs.stat(downloadedPath);
+        const stats = await fs.stat(outputPath);
         console.log(`[YouTube] 檔案大小: ${(stats.size / (1024 * 1024)).toFixed(2)}MB`);
-      } catch (error) {
-        throw new Error(`下載的檔案不存在: ${downloadedPath}`);
-      }
-      
-      // 如果不是 MP3，需要轉換
-      if (!audioFile.endsWith('.mp3')) {
-        // 如果下載的不是 MP3，嘗試轉換（需要 ffmpeg）
-        console.log(`[YouTube] 轉換音訊格式為 MP3 (從 ${audioFile})...`);
-        const { execFile } = await import('child_process');
-        const { promisify } = await import('util');
-        const execFileAsync = promisify(execFile);
-        const ffmpegPath = (await import('@ffmpeg-installer/ffmpeg')).default.path;
         
-        try {
-          await execFileAsync(ffmpegPath, [
-            '-i', downloadedPath,
-            '-acodec', 'libmp3lame',
-            '-b:a', '128k',
-            outputPath,
-            '-y'
-          ], { maxBuffer: 1024 * 1024 * 10 });
-          
-          console.log(`[YouTube] 音訊轉換完成: ${outputPath}`);
-          // 刪除原始檔案
-          await fs.unlink(downloadedPath);
-        } catch (convertError: any) {
-          console.error(`[YouTube] 轉換失敗:`, convertError);
-          // 如果轉換失敗，嘗試直接使用原始檔案（但 OpenAI 可能不接受）
-          throw new Error(`音訊格式轉換失敗: ${convertError.message}`);
+        // 檢查檔案大小是否合理（至少 1KB）
+        if (stats.size < 1024) {
+          throw new Error('下載的檔案太小，可能下載失敗');
         }
-      } else {
-        // 已經是 MP3，直接重新命名或複製
-        if (downloadedPath !== outputPath) {
-          await fs.copyFile(downloadedPath, outputPath);
-          await fs.unlink(downloadedPath);
+      } catch (error: any) {
+        // 如果檔案不存在，檢查目錄中是否有其他檔案
+        const files = await fs.readdir(tempDir);
+        console.error(`[YouTube] 找不到 MP3 檔案。目錄內容:`, files);
+        
+        // 嘗試查找任何音訊檔案
+        const audioFile = files.find(f => 
+          (f.endsWith('.m4a') || f.endsWith('.webm') || f.endsWith('.opus') || f.endsWith('.mp3') || f.endsWith('.ogg')) &&
+          !f.endsWith('.part') &&
+          !f.endsWith('.ytdl')
+        );
+        
+        if (audioFile) {
+          console.log(`[YouTube] 找到其他格式的音訊檔案: ${audioFile}，嘗試轉換...`);
+          const downloadedPath = path.join(tempDir, audioFile);
+          const ffmpegPath = (await import('@ffmpeg-installer/ffmpeg')).default.path;
+          
+          try {
+            await execFileAsync(ffmpegPath, [
+              '-i', downloadedPath,
+              '-acodec', 'libmp3lame',
+              '-b:a', '128k',
+              outputPath,
+              '-y'
+            ], { maxBuffer: 1024 * 1024 * 10 });
+            
+            console.log(`[YouTube] 音訊轉換完成: ${outputPath}`);
+            await fs.unlink(downloadedPath);
+          } catch (convertError: any) {
+            throw new Error(`音訊格式轉換失敗: ${convertError.message}`);
+          }
+        } else {
+          throw new Error(`下載的檔案不存在: ${outputPath}`);
         }
       }
 

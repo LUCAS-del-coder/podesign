@@ -2,21 +2,20 @@
 FROM node:22-slim
 
 # 安裝必要的系統工具（僅用於建置和運行）
-# 包括 Python、ffmpeg 和必要的依賴，以支援 youtube-dl-exec (yt-dlp)
+# 包括 ffmpeg 和必要的依賴
 RUN apt-get update && apt-get install -y \
     curl \
-    python3 \
-    python3-pip \
     ffmpeg \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 安裝 yt-dlp（youtube-dl-exec 的依賴）
-# 使用 --break-system-packages 因為這是 Docker 容器，不會影響主機系統
-RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
+# 直接下載 yt-dlp 二進位檔（不需要 Python）
+# 這是更可靠的方式，避免 Python 環境問題
+RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp && \
+    chmod a+rx /usr/local/bin/yt-dlp
 
 # 驗證安裝
-RUN python3 --version && yt-dlp --version && ffmpeg -version | head -n 1
+RUN yt-dlp --version && ffmpeg -version | head -n 1
 
 # 設定工作目錄
 WORKDIR /app
