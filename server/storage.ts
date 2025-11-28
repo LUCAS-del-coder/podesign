@@ -49,9 +49,16 @@ function getStorageConfig(): StorageConfig {
 
 function buildUploadUrl(baseUrl: string, relKey: string): URL {
   // Manus Forge API endpoint format
+  // Try different possible endpoint formats
   const baseUrlWithSlash = ensureTrailingSlash(baseUrl);
+  
+  // Option 1: REST API format (v1/storage/upload)
   const url = new URL("v1/storage/upload", baseUrlWithSlash);
   url.searchParams.set("path", normalizeKey(relKey));
+  
+  // Log the URL for debugging
+  console.log(`[Storage] Building upload URL: ${url.toString()}`);
+  
   return url;
 }
 
@@ -141,9 +148,19 @@ export async function storagePut(
       console.log(`[Storage] Upload URL: ${uploadUrl.toString()}`);
       
       const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+      
+      // Log request details for debugging
+      console.log(`[Storage] Uploading to: ${uploadUrl.toString()}`);
+      console.log(`[Storage] File size: ${(typeof data === 'string' ? Buffer.from(data).length : data.length) / 1024 / 1024}MB`);
+      console.log(`[Storage] Content type: ${contentType}`);
+      
       const response = await fetch(uploadUrl, {
         method: "POST",
-        headers: buildAuthHeaders(apiKey),
+        headers: {
+          ...buildAuthHeaders(apiKey),
+          // Some APIs require explicit content-type for form-data
+          // Note: Don't set Content-Type for FormData, browser will set it with boundary
+        },
         body: formData,
       });
 
