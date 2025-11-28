@@ -370,10 +370,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     
   } catch (listError) {
     console.warn(`[LLM] Failed to list models, using fallback:`, listError);
-    // Fallback: try common model names directly
-    usedModel = "gemini-1.5-flash";
-    apiUrl = `https://generativelanguage.googleapis.com/v1/models/${usedModel}:generateContent?key=${ENV.googleGeminiApiKey}`;
-    console.log(`[LLM] Using fallback model: ${usedModel}`);
+    // Fallback: try updated model names (based on successful cases)
+    // Success cases use: gemini-1.5-pro-latest, gemini-2.0-flash
+    usedModel = "gemini-1.5-pro-latest";
+    // Prioritize v1beta API (as used in successful cases)
+    apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${usedModel}:generateContent?key=${ENV.googleGeminiApiKey}`;
+    console.log(`[LLM] Using fallback model: ${usedModel} (v1beta)`);
   }
   
   let response = await fetch(apiUrl, {
@@ -384,7 +386,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     body: JSON.stringify(payload),
   });
   
-  // If v1 fails with 404, try v1beta
+  // If current API fails with 404, try alternative models and API versions
   if (!response.ok) {
     const errorText = await response.text();
     let errorJson: any;
@@ -395,20 +397,50 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     }
     
     if (errorJson.error?.code === 404) {
-      console.log(`[LLM] v1 API returned 404, trying v1beta...`);
-      const v1betaUrl = `https://generativelanguage.googleapis.com/v1beta/models/${usedModel}:generateContent?key=${ENV.googleGeminiApiKey}`;
+      // Try alternative models based on successful cases
+      const fallbackModels = [
+        { version: "v1beta", name: "gemini-2.0-flash" },
+        { version: "v1beta", name: "gemini-1.5-flash-latest" },
+        { version: "v1", name: "gemini-1.5-pro-latest" },
+        { version: "v1beta", name: "gemini-1.5-pro" },
+      ];
       
-      response = await fetch(v1betaUrl, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      let lastError: Error | null = null;
+      for (const { version, name } of fallbackModels) {
+        try {
+          console.log(`[LLM] Trying fallback model: ${version}/${name}`);
+          const fallbackUrl = `https://generativelanguage.googleapis.com/${version}/models/${name}:generateContent?key=${ENV.googleGeminiApiKey}`;
+          
+          response = await fetch(fallbackUrl, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+          
+          if (response.ok) {
+            usedModel = name;
+            console.log(`[LLM] Successfully using fallback model: ${version}/${name}`);
+            break;
+          } else {
+            const errorText2 = await response.text();
+            const errorJson2 = JSON.parse(errorText2);
+            if (errorJson2.error?.code === 404) {
+              lastError = new Error(`Model ${version}/${name} not found`);
+              continue;
+            } else {
+              throw new Error(`API error: ${response.status} - ${errorText2}`);
+            }
+          }
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          continue;
+        }
+      }
       
       if (!response.ok) {
-        const errorText2 = await response.text();
-        throw new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText2}. Please check GOOGLE_GEMINI_API_KEY is correctly set in Railway.`);
+        throw new Error(`LLM invoke failed: All models failed. Last error: ${lastError?.message}. Please check GOOGLE_GEMINI_API_KEY is correctly set in Railway.`);
       }
     } else {
       // Other errors (401, 403, etc.)

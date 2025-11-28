@@ -446,12 +446,16 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
   "podcastScript": "第三人稱 Podcast 腳本（含 intro、主要內容、outro）"
 }`;
 
-  // 嘗試多個模型和 API 版本
+  // 嘗試多個模型和 API 版本（基於成功案例）
+  // 成功案例主要使用：gemini-1.5-pro-latest, gemini-2.0-flash
+  // 優先使用 v1beta API（成功案例主要使用此版本）
   const modelConfigs = [
-    { version: "v1", name: "gemini-1.5-flash" },
-    { version: "v1beta", name: "gemini-1.5-flash" },
-    { version: "v1", name: "gemini-1.5-pro" },
+    { version: "v1beta", name: "gemini-2.0-flash" },
+    { version: "v1beta", name: "gemini-1.5-pro-latest" },
+    { version: "v1beta", name: "gemini-1.5-flash-latest" },
     { version: "v1beta", name: "gemini-1.5-pro" },
+    { version: "v1", name: "gemini-1.5-pro-latest" },
+    { version: "v1beta", name: "gemini-1.5-flash" },
   ];
   
   let lastError: Error | null = null;
