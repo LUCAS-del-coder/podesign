@@ -659,71 +659,65 @@ export async function processYoutubeToPodcast(youtubeUrl: string): Promise<{
   
   console.log(`[YouTube] 開始處理: ${youtubeUrl} (Video ID: ${videoId})`);
 
-  // 優先嘗試：使用 Gemini 直接分析（快速方式）
-  // 注意：Gemini 直接分析可能不穩定，如果返回的內容不匹配，會回退到傳統方式
-  try {
-    console.log(`[YouTube] 嘗試使用 Gemini 直接分析 Video ID: ${videoId}...`);
-    const directResult = await analyzeYoutubeUrlDirectly(youtubeUrl);
-    
-    // 驗證：檢查返回的標題是否合理（基本驗證）
-    // 如果標題為空或明顯不合理，回退到傳統方式
-    if (!directResult.title || directResult.title.trim().length === 0) {
-      console.warn(`[YouTube] ⚠️  Gemini 返回的標題為空，回退到傳統方式`);
-      throw new Error("Gemini returned empty title, using traditional method");
+  // 暫時禁用 Gemini 直接分析，因為它可能返回錯誤的影片內容
+  // 強制使用傳統方式（下載+轉錄）以確保正確性
+  const USE_GEMINI_DIRECT_ANALYSIS = false; // 設為 false 以禁用直接分析
+  
+  if (USE_GEMINI_DIRECT_ANALYSIS) {
+    // 優先嘗試：使用 Gemini 直接分析（快速方式）
+    // 注意：Gemini 直接分析可能不穩定，如果返回的內容不匹配，會回退到傳統方式
+    try {
+      console.log(`[YouTube] 嘗試使用 Gemini 直接分析 Video ID: ${videoId}...`);
+      const directResult = await analyzeYoutubeUrlDirectly(youtubeUrl);
+      
+      // 驗證：檢查返回的標題是否合理（基本驗證）
+      // 如果標題為空或明顯不合理，回退到傳統方式
+      if (!directResult.title || directResult.title.trim().length === 0) {
+        console.warn(`[YouTube] ⚠️  Gemini 返回的標題為空，回退到傳統方式`);
+        throw new Error("Gemini returned empty title, using traditional method");
+      }
+      
+      // 生成假的 audioUrl 和 fileKey（因為沒有實際下載）
+      const fakeFileKey = `podcast-audio/${videoId}-gemini-direct.mp3`;
+      
+      console.log(`[YouTube] ✅ Gemini 直接分析成功！Video ID: ${videoId}, Title: ${directResult.title}`);
+      
+      return {
+        transcription: directResult.transcription,
+        summary: directResult.summary,
+        podcastScript: directResult.podcastScript,
+        language: directResult.language,
+        duration: 0, // 無法獲取實際時長
+        audioUrl: "", // 沒有實際音檔
+        audioFileKey: fakeFileKey,
+        title: directResult.title,
+      };
+    } catch (error) {
+      // 這是正常的回退流程，不應該顯示為錯誤
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.log(`[YouTube] ℹ️  Gemini 直接分析失敗，使用傳統方式（下載+轉錄）: ${errorMsg.substring(0, 100)}`);
     }
-    
-    // 生成假的 audioUrl 和 fileKey（因為沒有實際下載）
-    const fakeFileKey = `podcast-audio/${videoId}-gemini-direct.mp3`;
-    
-    console.log(`[YouTube] ✅ Gemini 直接分析成功！Video ID: ${videoId}, Title: ${directResult.title}`);
-    
-    return {
-      transcription: directResult.transcription,
-      summary: directResult.summary,
-      podcastScript: directResult.podcastScript,
-      language: directResult.language,
-      duration: 0, // 無法獲取實際時長
-      audioUrl: "", // 沒有實際音檔
-      audioFileKey: fakeFileKey,
-      title: directResult.title,
-    };
-  } catch (error) {
-    // 這是正常的回退流程，不應該顯示為錯誤
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    
-    // 所有這些情況都是正常的回退，使用 info 級別而非 warn/error
-    if (errorMsg.includes("Gemini 直接分析不可用") || 
-        errorMsg.includes("所有模型都失敗") ||
-        errorMsg.includes("所有 Gemini 模型都無法使用") ||
-        errorMsg.includes("Rate limit") ||
-        errorMsg.includes("429") ||
-        errorMsg.includes("404") ||
-        errorMsg.includes("JSON") ||
-        errorMsg.includes("control character") ||
-        errorMsg.includes("quota")) {
-      console.log(`[YouTube] ℹ️  Gemini 直接分析不可用，使用傳統方式（下載+轉錄）`);
-    } else {
-      // 其他未知錯誤，記錄但不中斷
-      console.log(`[YouTube] ℹ️  使用傳統方式處理（下載+轉錄）`);
-    }
-    
-    // 回退到傳統方式：下載並轉錄
-    console.log(`[YouTube] 使用傳統方式：下載並轉錄...`);
+  } else {
+    console.log(`[YouTube] ℹ️  Gemini 直接分析已禁用，使用傳統方式（下載+轉錄）以確保正確性`);
+  }
+  
+  // 使用傳統方式：下載並轉錄（確保正確性）
+  console.log(`[YouTube] 使用傳統方式：下載並轉錄 Video ID: ${videoId}...`);
   const transcriptionResult = await transcribeYoutubeVideo(youtubeUrl);
-    console.log(`[YouTube] 轉錄完成，文字長度: ${transcriptionResult.text.length} 字元`);
+  console.log(`[YouTube] 轉錄完成，文字長度: ${transcriptionResult.text.length} 字元`);
 
-    console.log(`[YouTube] 開始分析內容...`);
+  console.log(`[YouTube] 開始分析內容...`);
   const analysisResult = await analyzePodcastContent(transcriptionResult.text);
-    console.log(`[YouTube] 內容分析完成`);
+  console.log(`[YouTube] 內容分析完成`);
 
   return {
     transcription: transcriptionResult.text,
     summary: analysisResult.summary,
     podcastScript: analysisResult.podcastScript,
     language: transcriptionResult.language,
+    duration: transcriptionResult.duration,
     audioUrl: transcriptionResult.audioUrl,
     audioFileKey: transcriptionResult.audioFileKey,
     title: transcriptionResult.title,
   };
-  }
 }
