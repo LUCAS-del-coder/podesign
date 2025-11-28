@@ -222,11 +222,11 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
 
       console.log(`[YouTube] 音訊檔案大小: ${sizeMB.toFixed(2)}MB`);
 
-      // 檢查檔案大小（OpenAI Whisper 限制 25MB，但我們設定 16MB 以確保穩定）
-      if (sizeMB > 16) {
+      // 檢查檔案大小（OpenAI Whisper API 限制 25MB）
+      if (sizeMB > 25) {
         throw new Error(
-          `音訊檔案過大 (${sizeMB.toFixed(2)}MB)，超過 16MB 限制。` +
-          `請選擇較短的影片（建議 30 分鐘以內）或使用文字輸入功能。`
+          `音訊檔案過大 (${sizeMB.toFixed(2)}MB)，超過 25MB 限制。` +
+          `請選擇較短的影片（建議 40 分鐘以內）或使用文字輸入功能。`
         );
       }
 
