@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -215,6 +216,18 @@ const assertApiKey = () => {
   }
 };
 
+// Initialize Gemini client (singleton)
+let geminiClient: GoogleGenerativeAI | null = null;
+
+const getGeminiClient = (): GoogleGenerativeAI => {
+  if (geminiClient) {
+    return geminiClient;
+  }
+  assertApiKey();
+  geminiClient = new GoogleGenerativeAI(ENV.googleGeminiApiKey);
+  return geminiClient;
+};
+
 const normalizeResponseFormat = ({
   responseFormat,
   response_format,
@@ -327,128 +340,87 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     }
   }
 
-  // First, list available models to get the correct model names
-  let apiUrl: string;
+  // Use official SDK instead of direct REST API calls
+  const client = getGeminiClient();
+  
+  // Try models in order of preference (based on successful cases)
+  const modelNames = [
+    "gemini-1.5-pro-latest",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-pro",
+    "gemini-1.5-flash",
+  ];
+  
+  let lastError: Error | null = null;
   let usedModel = "";
+  let result: any = null;
   
-  try {
-    // List available models using v1 API
-    const modelsUrl = `https://generativelanguage.googleapis.com/v1/models?key=${ENV.googleGeminiApiKey}`;
-    console.log(`[LLM] Listing available models...`);
-    
-    const modelsResponse = await fetch(modelsUrl);
-    
-    if (!modelsResponse.ok) {
-      const errorText = await modelsResponse.text();
-      console.error(`[LLM] Failed to list models: ${modelsResponse.status} - ${errorText}`);
-      throw new Error(`Failed to list models: ${modelsResponse.status} - ${errorText}`);
-    }
-    
-    const modelsData = await modelsResponse.json();
-    const availableModels = modelsData.models || [];
-    
-    console.log(`[LLM] Available models: ${availableModels.map((m: any) => m.name).join(', ')}`);
-    
-    // Find a model that supports generateContent
-    const generateContentModel = availableModels.find((m: any) => 
-      m.supportedGenerationMethods?.includes('generateContent')
-    );
-    
-    if (!generateContentModel) {
-      throw new Error("No model with generateContent method found in available models");
-    }
-    
-    // Model name format is usually "models/gemini-1.5-flash" or just "gemini-1.5-flash"
-    // Remove "models/" prefix if present
-    const modelName = generateContentModel.name.replace(/^models\//, '');
-    usedModel = modelName;
-    
-    console.log(`[LLM] Selected model: ${modelName}`);
-    
-    // Try v1 API first
-    apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${ENV.googleGeminiApiKey}`;
-    
-  } catch (listError) {
-    console.warn(`[LLM] Failed to list models, using fallback:`, listError);
-    // Fallback: try updated model names (based on successful cases)
-    // Success cases use: gemini-1.5-pro-latest, gemini-2.0-flash
-    usedModel = "gemini-1.5-pro-latest";
-    // Prioritize v1beta API (as used in successful cases)
-    apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${usedModel}:generateContent?key=${ENV.googleGeminiApiKey}`;
-    console.log(`[LLM] Using fallback model: ${usedModel} (v1beta)`);
-  }
-  
-  let response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  
-  // If current API fails with 404, try alternative models and API versions
-  if (!response.ok) {
-    const errorText = await response.text();
-    let errorJson: any;
+  for (const modelName of modelNames) {
     try {
-      errorJson = JSON.parse(errorText);
-    } catch {
-      errorJson = { error: { code: response.status } };
-    }
-    
-    if (errorJson.error?.code === 404) {
-      // Try alternative models based on successful cases
-      const fallbackModels = [
-        { version: "v1beta", name: "gemini-2.0-flash" },
-        { version: "v1beta", name: "gemini-1.5-flash-latest" },
-        { version: "v1", name: "gemini-1.5-pro-latest" },
-        { version: "v1beta", name: "gemini-1.5-pro" },
-      ];
+      console.log(`[LLM] Trying model: ${modelName}`);
+      const model = client.getGenerativeModel({ model: modelName });
       
-      let lastError: Error | null = null;
-      for (const { version, name } of fallbackModels) {
-        try {
-          console.log(`[LLM] Trying fallback model: ${version}/${name}`);
-          const fallbackUrl = `https://generativelanguage.googleapis.com/${version}/models/${name}:generateContent?key=${ENV.googleGeminiApiKey}`;
-          
-          response = await fetch(fallbackUrl, {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          });
-          
-          if (response.ok) {
-            usedModel = name;
-            console.log(`[LLM] Successfully using fallback model: ${version}/${name}`);
-            break;
-          } else {
-            const errorText2 = await response.text();
-            const errorJson2 = JSON.parse(errorText2);
-            if (errorJson2.error?.code === 404) {
-              lastError = new Error(`Model ${version}/${name} not found`);
-              continue;
-            } else {
-              throw new Error(`API error: ${response.status} - ${errorText2}`);
-            }
-          }
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error(String(error));
-          continue;
-        }
+      // Convert Gemini format messages to SDK format
+      const chat = model.startChat({
+        history: geminiMessages.slice(0, -1).map(msg => ({
+          role: msg.role === "model" ? "model" : "user",
+          parts: msg.parts,
+        })),
+      });
+      
+      const lastMsg = geminiMessages[geminiMessages.length - 1];
+      const response = await chat.sendMessage(lastMsg.parts.map(p => p.text).join(" "));
+      
+      const responseText = response.response.text();
+      
+      if (!responseText) {
+        throw new Error("Gemini 未返回內容");
       }
       
-      if (!response.ok) {
-        throw new Error(`LLM invoke failed: All models failed. Last error: ${lastError?.message}. Please check GOOGLE_GEMINI_API_KEY is correctly set in Railway.`);
+      usedModel = modelName;
+      console.log(`[LLM] Successfully using model: ${modelName}`);
+      
+      // Convert SDK response to our format
+      result = {
+        id: `gemini-${Date.now()}`,
+        created: Math.floor(Date.now() / 1000),
+        model: modelName,
+        choices: [{
+          index: 0,
+          message: {
+            role: "assistant" as Role,
+            content: responseText,
+          },
+          finish_reason: response.response.candidates?.[0]?.finishReason || null,
+        }],
+        usage: response.response.usageMetadata ? {
+          prompt_tokens: response.response.usageMetadata.promptTokenCount || 0,
+          completion_tokens: response.response.usageMetadata.candidatesTokenCount || 0,
+          total_tokens: response.response.usageMetadata.totalTokenCount || 0,
+        } : undefined,
+      };
+      
+      break;
+    } catch (error: any) {
+      console.warn(`[LLM] Model ${modelName} failed:`, error.message || error);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // If it's a 404 or model not found error, try next model
+      if (error.message?.includes("404") || error.message?.includes("not found") || error.message?.includes("NOT_FOUND")) {
+        continue;
       }
-    } else {
-      // Other errors (401, 403, etc.)
-      throw new Error(`LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}. Please check GOOGLE_GEMINI_API_KEY is correctly set.`);
+      
+      // For other errors, throw immediately
+      throw error;
     }
   }
-
-  const geminiResponse = await response.json();
+  
+  if (!result) {
+    throw new Error(`LLM invoke failed: All models failed. Last error: ${lastError?.message}. Please check GOOGLE_GEMINI_API_KEY is correctly set in Railway.`);
+  }
+  
+  const geminiResponse = { model: usedModel, candidates: result.choices };
   
   // Convert Gemini response to our format
   const result: InvokeResult = {
