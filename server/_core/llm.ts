@@ -327,11 +327,37 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     }
   }
 
-  // Use v1beta API - try different model names for compatibility
-  // First try gemini-1.5-flash-latest, fallback to gemini-1.5-flash
-  let apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${ENV.googleGeminiApiKey}`;
+  // First, try to list available models to find the correct one
+  // Use v1 API to list models, then use the first available one
+  let apiUrl = `https://generativelanguage.googleapis.com/v1/models?key=${ENV.googleGeminiApiKey}`;
   
-  // If the model doesn't exist, we'll get an error and can try alternatives
+  try {
+    const modelsResponse = await fetch(apiUrl);
+    if (modelsResponse.ok) {
+      const modelsData = await modelsResponse.json();
+      const availableModels = modelsData.models || [];
+      console.log(`[LLM] Available models: ${availableModels.map((m: any) => m.name).join(', ')}`);
+      
+      // Find a model that supports generateContent
+      const generateContentModel = availableModels.find((m: any) => 
+        m.supportedGenerationMethods?.includes('generateContent')
+      );
+      
+      if (generateContentModel) {
+        apiUrl = `https://generativelanguage.googleapis.com/v1/models/${generateContentModel.name}:generateContent?key=${ENV.googleGeminiApiKey}`;
+        console.log(`[LLM] Using model: ${generateContentModel.name}`);
+      } else {
+        // Fallback to common model names
+        throw new Error("No generateContent model found");
+      }
+    } else {
+      throw new Error("Failed to list models");
+    }
+  } catch (error) {
+    console.warn(`[LLM] Failed to list models, using fallback:`, error);
+    // Fallback: try common model names
+    apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${ENV.googleGeminiApiKey}`;
+  }
   
   let response = await fetch(apiUrl, {
     method: "POST",

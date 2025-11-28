@@ -446,19 +446,29 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
   "podcastScript": "第三人稱 Podcast 腳本（含 intro、主要內容、outro）"
 }`;
 
-  // 使用 Gemini API 直接分析 YouTube URL
-  // 嘗試多個模型名稱以確保兼容性
-  const modelNames = [
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-  ];
-  
-  let lastError: Error | null = null;
-  
-  for (const modelName of modelNames) {
-    try {
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${ENV.googleGeminiApiKey}`;
+  // 先列出可用模型，找到支援 generateContent 的模型
+  try {
+    const modelsUrl = `https://generativelanguage.googleapis.com/v1/models?key=${ENV.googleGeminiApiKey}`;
+    const modelsResponse = await fetch(modelsUrl);
+    
+    if (modelsResponse.ok) {
+      const modelsData = await modelsResponse.json();
+      const availableModels = modelsData.models || [];
+      console.log(`[YouTube] Available Gemini models: ${availableModels.map((m: any) => m.name).join(', ')}`);
+      
+      // 找到支援 generateContent 的模型
+      const generateContentModel = availableModels.find((m: any) => 
+        m.supportedGenerationMethods?.includes('generateContent')
+      );
+      
+      if (!generateContentModel) {
+        throw new Error("No generateContent model available");
+      }
+      
+      const modelName = generateContentModel.name.replace('models/', '');
+      console.log(`[YouTube] Using Gemini model: ${modelName}`);
+      
+      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${ENV.googleGeminiApiKey}`;
       
       const payload = {
         contents: [{
@@ -485,16 +495,6 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
 
       if (!response.ok) {
         const errorText = await response.text();
-        const errorJson = JSON.parse(errorText);
-        
-        // 如果是 404 錯誤（模型不存在），嘗試下一個模型
-        if (errorJson.error?.code === 404) {
-          console.log(`[YouTube] Model ${modelName} not found, trying next model...`);
-          lastError = new Error(`Model ${modelName} not found`);
-          continue; // 嘗試下一個模型
-        }
-        
-        // 其他錯誤直接拋出
         throw new Error(`Gemini API failed: ${response.status} ${response.statusText} – ${errorText}`);
       }
       
@@ -534,15 +534,13 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         language: "zh",
         title: result.title,
       };
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      // 繼續嘗試下一個模型
-      continue;
+    } else {
+      throw new Error("Failed to list available models");
     }
+  } catch (error) {
+    console.warn(`[YouTube] Gemini 直接分析失敗，將回退到傳統方式:`, error);
+    throw error; // 讓上層函數處理回退
   }
-  
-  // 所有模型都失敗
-  throw lastError || new Error("所有 Gemini 模型都無法使用");
 
   const geminiResponse = await response.json();
   const content = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
