@@ -327,16 +327,55 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     }
   }
 
-  // Use v1beta API with gemini-1.5-flash (most stable and widely available)
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${ENV.googleGeminiApiKey}`;
+  // Use v1beta API - try different model names for compatibility
+  // First try gemini-1.5-flash-latest, fallback to gemini-1.5-flash
+  let apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${ENV.googleGeminiApiKey}`;
   
-  const response = await fetch(apiUrl, {
+  // If the model doesn't exist, we'll get an error and can try alternatives
+  
+  let response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
     },
     body: JSON.stringify(payload),
   });
+
+  // If model not found, try alternative model names
+  if (!response.ok) {
+    const errorText = await response.text();
+    const errorJson = JSON.parse(errorText);
+    
+    // Try gemini-1.5-flash if gemini-1.5-flash-latest fails
+    if (errorJson.error?.code === 404 && apiUrl.includes("gemini-1.5-flash-latest")) {
+      console.log(`[LLM] gemini-1.5-flash-latest not found, trying gemini-1.5-flash...`);
+      apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${ENV.googleGeminiApiKey}`;
+      response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+    }
+    
+    // If still fails, try gemini-1.5-pro
+    if (!response.ok) {
+      const errorText2 = await response.text();
+      const errorJson2 = JSON.parse(errorText2);
+      if (errorJson2.error?.code === 404 && apiUrl.includes("gemini-1.5-flash")) {
+        console.log(`[LLM] gemini-1.5-flash not found, trying gemini-1.5-pro...`);
+        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${ENV.googleGeminiApiKey}`;
+        response = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+      }
+    }
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
