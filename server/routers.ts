@@ -569,6 +569,7 @@ async function processPodcastTask(
     
     // 驗證：從資料庫獲取任務資訊，確保使用正確的 URL
     const { getPodcastTask } = await import('./db');
+    const { extractVideoId } = await import('./youtubeService');
     const dbTask = await getPodcastTask(taskId, -1); // 使用 -1 跳過 userId 檢查
     if (!dbTask) {
       throw new Error(`Task ${taskId} not found in database`);
@@ -577,26 +578,25 @@ async function processPodcastTask(
     // 驗證 URL 是否匹配（防止並發或參數錯誤）
     if (inputType === 'youtube') {
       const dbUrl = dbTask.youtubeUrl;
-      // 提取 video ID 進行比較（因為 URL 格式可能不同）
-      const extractVideoId = (url: string) => {
-        const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
-        return match ? match[1] : null;
-      };
       
+      // 提取 video ID 進行比較（因為 URL 格式可能不同）
       const inputVideoId = extractVideoId(inputContent);
       const dbVideoId = extractVideoId(dbUrl);
       
       if (inputVideoId && dbVideoId && inputVideoId !== dbVideoId) {
-        console.error(`[Task ${taskId}] URL mismatch detected!`);
-        console.error(`[Task ${taskId}] Input URL: ${inputContent}`);
-        console.error(`[Task ${taskId}] DB URL: ${dbUrl}`);
-        console.error(`[Task ${taskId}] Using DB URL to ensure correctness`);
+        console.error(`[Task ${taskId}] ⚠️  URL mismatch detected!`);
+        console.error(`[Task ${taskId}] Input URL: ${inputContent} (Video ID: ${inputVideoId})`);
+        console.error(`[Task ${taskId}] DB URL: ${dbUrl} (Video ID: ${dbVideoId})`);
+        console.error(`[Task ${taskId}] 🔧 Using DB URL to ensure correctness`);
         // 使用資料庫中的 URL，確保正確性
         inputContent = dbUrl;
       } else if (!inputVideoId && dbVideoId) {
         // 如果輸入的 URL 無法解析，使用資料庫中的 URL
-        console.warn(`[Task ${taskId}] Input URL cannot be parsed, using DB URL: ${dbUrl}`);
+        console.warn(`[Task ${taskId}] ⚠️  Input URL cannot be parsed, using DB URL: ${dbUrl}`);
         inputContent = dbUrl;
+      } else if (inputVideoId && dbVideoId && inputVideoId === dbVideoId) {
+        // URL 匹配，記錄確認
+        console.log(`[Task ${taskId}] ✅ URL verified: ${inputContent} (Video ID: ${inputVideoId})`);
       }
       
       console.log(`[Task ${taskId}] Processing YouTube URL: ${inputContent}`);
