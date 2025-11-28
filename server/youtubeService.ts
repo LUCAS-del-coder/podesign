@@ -460,10 +460,11 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
   const client = new GoogleGenerativeAI(ENV.googleGeminiApiKey);
   
   // 嘗試多個模型（與 llm.ts 使用相同的模型列表）
+  // 優先使用穩定版本，實驗版本可能不在免費層
   const modelNames = [
-    "gemini-2.0-flash-exp", // Experimental, latest
-    "gemini-2.0-flash",
-    "gemini-1.5-pro-latest", // Fallback (may still work)
+    "gemini-2.0-flash", // 穩定版本，優先使用
+    "gemini-1.5-pro-latest", // Fallback
+    "gemini-2.0-flash-exp", // 實驗版本，最後嘗試（可能不在免費層）
   ];
   
   let lastError: Error | null = null;
@@ -519,18 +520,32 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         title: result.title,
       };
     } catch (error: any) {
-      console.warn(`[YouTube] Model ${modelName} failed:`, error.message || error);
+      const errorMessage = error.message || String(error);
+      console.warn(`[YouTube] Model ${modelName} failed:`, errorMessage);
       lastError = error instanceof Error ? error : new Error(String(error));
       
-      // 如果是 404 或模型不存在錯誤，嘗試下一個模型
-      if (error.message?.includes("404") || 
-          error.message?.includes("not found") || 
-          error.message?.includes("NOT_FOUND")) {
+      // 處理速率限制錯誤（429）- 嘗試下一個模型
+      if (errorMessage.includes("429") || 
+          errorMessage.includes("quota") || 
+          errorMessage.includes("rate limit") ||
+          errorMessage.includes("Too Many Requests")) {
+        console.warn(`[YouTube] Rate limit exceeded for ${modelName}, trying next model...`);
         continue;
       }
       
-      // 其他錯誤直接拋出
-      throw error;
+      // 如果是 404 或模型不存在錯誤，嘗試下一個模型
+      if (errorMessage.includes("404") || 
+          errorMessage.includes("not found") || 
+          errorMessage.includes("NOT_FOUND")) {
+        continue;
+      }
+      
+      // 對於其他錯誤，如果是第一個模型失敗，嘗試下一個；否則拋出
+      if (modelName === modelNames[0]) {
+        continue; // 第一個模型失敗，嘗試下一個
+      } else {
+        throw error; // 其他模型失敗，拋出錯誤
+      }
     }
   }
   

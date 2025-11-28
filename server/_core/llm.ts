@@ -344,11 +344,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const client = getGeminiClient();
   
   // Note: Gemini 1.5 series was deprecated in September 2025
-  // Use Gemini 2.x or 3.x series models
+  // Use Gemini 2.x series models
+  // 優先使用穩定版本，實驗版本可能不在免費層
   const modelNames = [
-    "gemini-2.0-flash-exp", // Experimental, latest
-    "gemini-2.0-flash",
-    "gemini-1.5-pro-latest", // Fallback (may still work)
+    "gemini-2.0-flash", // 穩定版本，優先使用
+    "gemini-1.5-pro-latest", // Fallback
+    "gemini-2.0-flash-exp", // 實驗版本，最後嘗試（可能不在免費層）
   ];
   
   let lastError: Error | null = null;
@@ -405,19 +406,97 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       
       break;
     } catch (error: any) {
-      console.warn(`[LLM] Model ${modelName} failed:`, error.message || error);
+      const errorMessage = error.message || String(error);
+      console.warn(`[LLM] Model ${modelName} failed:`, errorMessage);
       lastError = error instanceof Error ? error : new Error(String(error));
       
-      // If it's a 404 or model not found error, try next model
-      if (error.message?.includes("404") || 
-          error.message?.includes("not found") || 
-          error.message?.includes("NOT_FOUND") ||
-          error.message?.includes("404")) {
+      // 處理速率限制錯誤（429）- 嘗試下一個模型或等待重試
+      if (errorMessage.includes("429") || 
+          errorMessage.includes("quota") || 
+          errorMessage.includes("rate limit") ||
+          errorMessage.includes("Too Many Requests")) {
+        console.warn(`[LLM] Rate limit exceeded for ${modelName}, trying next model...`);
+        
+        // 如果是第一個模型（穩定版本）也遇到速率限制，等待後重試
+        if (modelName === "gemini-2.0-flash") {
+          // 提取重試延遲時間
+          const retryDelayMatch = errorMessage.match(/retry in ([\d.]+)s/i);
+          if (retryDelayMatch) {
+            const delaySeconds = Math.ceil(parseFloat(retryDelayMatch[1]));
+            console.log(`[LLM] Waiting ${delaySeconds} seconds before retry...`);
+            await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000));
+            
+            // 重試一次
+            try {
+              const model = client.getGenerativeModel({ 
+                model: modelName,
+                generationConfig: {
+                  temperature: 0.7,
+                  maxOutputTokens: 4096,
+                },
+              });
+              
+              const prompt = geminiMessages.map(msg => {
+                const text = msg.parts.map(p => p.text).join(" ");
+                return msg.role === "model" ? `Assistant: ${text}` : `User: ${text}`;
+              }).join("\n\n");
+              
+              const response = await model.generateContent(prompt);
+              const responseText = response.response.text();
+              
+              if (responseText) {
+                usedModel = modelName;
+                console.log(`[LLM] Successfully using model: ${modelName} after retry`);
+                
+                result = {
+                  id: `gemini-${Date.now()}`,
+                  created: Math.floor(Date.now() / 1000),
+                  model: modelName,
+                  choices: [{
+                    index: 0,
+                    message: {
+                      role: "assistant" as Role,
+                      content: responseText,
+                    },
+                    finish_reason: response.response.candidates?.[0]?.finishReason || null,
+                  }],
+                  usage: response.response.usageMetadata ? {
+                    prompt_tokens: response.response.usageMetadata.promptTokenCount || 0,
+                    completion_tokens: response.response.usageMetadata.candidatesTokenCount || 0,
+                    total_tokens: response.response.usageMetadata.totalTokenCount || 0,
+                  } : undefined,
+                };
+                
+                break;
+              }
+            } catch (retryError) {
+              // 重試也失敗，繼續嘗試下一個模型
+              console.warn(`[LLM] Retry also failed for ${modelName}, trying next model...`);
+              continue;
+            }
+          } else {
+            // 沒有重試延遲資訊，直接嘗試下一個模型
+            continue;
+          }
+        } else {
+          // 其他模型遇到速率限制，直接嘗試下一個
+          continue;
+        }
+      }
+      
+      // 如果是 404 或模型不存在錯誤，嘗試下一個模型
+      if (errorMessage.includes("404") || 
+          errorMessage.includes("not found") || 
+          errorMessage.includes("NOT_FOUND")) {
         continue;
       }
       
-      // For other errors, throw immediately
-      throw error;
+      // 對於其他錯誤，如果是第一個模型失敗，嘗試下一個；否則拋出
+      if (modelName === modelNames[0]) {
+        continue; // 第一個模型失敗，嘗試下一個
+      } else {
+        throw error; // 其他模型失敗，拋出錯誤
+      }
     }
   }
   
