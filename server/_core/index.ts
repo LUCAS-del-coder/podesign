@@ -34,6 +34,7 @@ async function startServer() {
   console.log("[Startup] JWT_SECRET:", process.env.JWT_SECRET ? "Set (hidden)" : "NOT SET");
   console.log("[Startup] GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID ? "Set (hidden)" : "NOT SET");
   console.log("[Startup] ASSEMBLYAI_API_KEY:", process.env.ASSEMBLYAI_API_KEY ? "Set (hidden)" : "NOT SET");
+  console.log("[Startup] GOOGLE_GEMINI_API_KEY:", process.env.GOOGLE_GEMINI_API_KEY ? "Set (hidden)" : "NOT SET");
   console.log("[Startup] NODE_ENV:", process.env.NODE_ENV);
 
   // 在啟動伺服器前執行資料庫遷移
