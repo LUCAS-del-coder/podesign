@@ -71,58 +71,74 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
     try {
       console.log(`[YouTube] 使用 yt-dlp 下載音訊...`);
       
-      // 先獲取影片資訊
-      let videoInfo: any;
+      // 先獲取影片資訊（使用 dumpSingleJson 選項）
+      let videoInfo: any = {};
+      let title = 'Unknown';
+      let duration = 0;
+      
       try {
+        // 使用 dumpSingleJson 獲取單一影片的 JSON 資訊
         const infoResult = await youtubeDlExec(youtubeUrl, {
-          dumpJson: true,
+          dumpSingleJson: true,
           noWarnings: true,
           noCallHome: true,
           noCheckCertificate: true,
           preferFreeFormats: true,
         });
         
-        // youtube-dl-exec 返回的是字串（JSON），需要解析
+        // youtube-dl-exec 可能返回字串或物件
         if (typeof infoResult === 'string') {
-          videoInfo = JSON.parse(infoResult);
-        } else {
+          try {
+            videoInfo = JSON.parse(infoResult);
+          } catch (parseError) {
+            console.warn(`[YouTube] JSON 解析失敗:`, parseError);
+          }
+        } else if (infoResult && typeof infoResult === 'object') {
           videoInfo = infoResult;
         }
+        
+        title = videoInfo.title || 'Unknown';
+        duration = videoInfo.duration || 0;
       } catch (error: any) {
-        console.warn(`[YouTube] 獲取影片資訊失敗，繼續下載:`, error.message);
-        videoInfo = {};
+        console.warn(`[YouTube] 獲取影片資訊失敗，繼續下載:`, error.message || error);
+        // 繼續下載，即使獲取資訊失敗
       }
 
-      const title = (videoInfo && typeof videoInfo === 'object' && videoInfo.title) ? videoInfo.title : 'Unknown';
-      const duration = (videoInfo && typeof videoInfo === 'object' && videoInfo.duration) ? videoInfo.duration : 0;
       console.log(`[YouTube] 影片標題: ${title}`);
       console.log(`[YouTube] 影片長度: ${duration} 秒`);
 
       // 下載音訊（使用 yt-dlp 的最佳音訊格式）
       console.log(`[YouTube] 開始下載音訊...`);
+      // 使用 videoId 作為檔案名稱，讓 yt-dlp 自動決定副檔名
       const outputTemplate = path.join(tempDir, `${videoId}.%(ext)s`);
       
       console.log(`[YouTube] 輸出模板: ${outputTemplate}`);
       console.log(`[YouTube] 臨時目錄: ${tempDir}`);
       
       try {
+        // 使用 yt-dlp 的格式選項下載最佳音訊
         await youtubeDlExec(youtubeUrl, {
-          format: 'bestaudio[ext=m4a]/bestaudio/best', // 優先選擇 m4a，然後其他音訊格式
+          format: 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
           output: outputTemplate,
           noWarnings: true,
           noCallHome: true,
           noCheckCertificate: true,
           preferFreeFormats: true,
-          verbose: true, // 啟用詳細日誌
         });
       } catch (downloadError: any) {
-        console.error(`[YouTube] yt-dlp 下載錯誤:`, downloadError);
-        // 檢查是否實際上下載了檔案
+        console.error(`[YouTube] yt-dlp 下載錯誤:`, downloadError.message || downloadError);
+        console.error(`[YouTube] 錯誤詳情:`, downloadError);
+        
+        // 檢查是否實際上下載了檔案（即使有錯誤）
         const filesAfterError = await fs.readdir(tempDir);
         console.log(`[YouTube] 錯誤後目錄中的檔案:`, filesAfterError);
         
         // 如果錯誤但檔案存在，繼續處理
         if (filesAfterError.length === 0) {
+          // 如果完全沒有檔案，檢查是否是特定錯誤
+          if (downloadError.message?.includes('403') || downloadError.stderr?.includes('403')) {
+            throw new Error('YouTube 暫時限制存取（403），請稍後重試或嘗試其他影片');
+          }
           throw downloadError;
         }
       }
