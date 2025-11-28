@@ -7,24 +7,76 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 type StorageConfig = { baseUrl: string; apiKey: string };
 
-// Check if AWS S3 is configured
+// Check if any S3-compatible storage is configured (AWS S3, Cloudflare R2, Backblaze B2)
 function isS3Configured(): boolean {
-  return !!(ENV.awsAccessKeyId && ENV.awsSecretAccessKey && ENV.awsRegion && ENV.awsS3Bucket);
+  // Check for AWS S3
+  if (ENV.awsAccessKeyId && ENV.awsSecretAccessKey && ENV.awsRegion && ENV.awsS3Bucket) {
+    return true;
+  }
+  // Check for Cloudflare R2
+  if (ENV.cloudflareAccountId && ENV.cloudflareAccessKeyId && ENV.cloudflareSecretAccessKey && ENV.cloudflareR2Bucket) {
+    return true;
+  }
+  // Check for Backblaze B2
+  if (ENV.backblazeKeyId && ENV.backblazeApplicationKey && ENV.backblazeBucketName) {
+    return true;
+  }
+  return false;
 }
 
-// Get AWS S3 client
-function getS3Client(): S3Client {
-  if (!isS3Configured()) {
-    throw new Error('AWS S3 is not configured');
+// Get S3-compatible client (supports AWS S3, Cloudflare R2, Backblaze B2)
+function getS3Client(): { client: S3Client; bucket: string; region?: string; publicUrl?: string } {
+  // Cloudflare R2 (priority if configured)
+  if (ENV.cloudflareAccountId && ENV.cloudflareAccessKeyId && ENV.cloudflareSecretAccessKey && ENV.cloudflareR2Bucket) {
+    return {
+      client: new S3Client({
+        region: 'auto',
+        endpoint: `https://${ENV.cloudflareAccountId}.r2.cloudflarestorage.com`,
+        credentials: {
+          accessKeyId: ENV.cloudflareAccessKeyId,
+          secretAccessKey: ENV.cloudflareSecretAccessKey,
+        },
+      }),
+      bucket: ENV.cloudflareR2Bucket,
+      publicUrl: ENV.cloudflareR2PublicUrl,
+    };
   }
   
-  return new S3Client({
-    region: ENV.awsRegion,
-    credentials: {
-      accessKeyId: ENV.awsAccessKeyId!,
-      secretAccessKey: ENV.awsSecretAccessKey!,
-    },
-  });
+  // Backblaze B2
+  if (ENV.backblazeKeyId && ENV.backblazeApplicationKey && ENV.backblazeBucketName) {
+    // Backblaze B2 uses S3-compatible API
+    const endpoint = ENV.backblazeEndpoint || `https://s3.${ENV.backblazeRegion || 'us-west-004'}.backblazeb2.com`;
+    return {
+      client: new S3Client({
+        region: ENV.backblazeRegion || 'us-west-004',
+        endpoint: endpoint,
+        credentials: {
+          accessKeyId: ENV.backblazeKeyId,
+          secretAccessKey: ENV.backblazeApplicationKey,
+        },
+      }),
+      bucket: ENV.backblazeBucketName,
+      publicUrl: ENV.backblazePublicUrl,
+    };
+  }
+  
+  // AWS S3 (fallback)
+  if (ENV.awsAccessKeyId && ENV.awsSecretAccessKey && ENV.awsRegion && ENV.awsS3Bucket) {
+    return {
+      client: new S3Client({
+        region: ENV.awsRegion,
+        credentials: {
+          accessKeyId: ENV.awsAccessKeyId,
+          secretAccessKey: ENV.awsSecretAccessKey,
+        },
+      }),
+      bucket: ENV.awsS3Bucket,
+      region: ENV.awsRegion,
+      publicUrl: ENV.awsS3PublicUrl,
+    };
+  }
+  
+  throw new Error('No S3-compatible storage configured');
 }
 
 // Get Manus Forge API config (legacy support)
@@ -112,32 +164,50 @@ export async function storagePut(
 ): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
   
-  // Use AWS S3 if configured, otherwise use Manus Forge API
+  // Use S3-compatible storage if configured, otherwise use Manus Forge API
   if (isS3Configured()) {
     try {
-      console.log(`[Storage] Using AWS S3: bucket=${ENV.awsS3Bucket}, region=${ENV.awsRegion}`);
-      const s3Client = getS3Client();
+      const { client, bucket, region, publicUrl } = getS3Client();
       const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
       
+      // Determine storage type for logging
+      let storageType = 'S3-compatible';
+      if (ENV.cloudflareAccountId) storageType = 'Cloudflare R2';
+      else if (ENV.backblazeKeyId) storageType = 'Backblaze B2';
+      else if (ENV.awsAccessKeyId) storageType = 'AWS S3';
+      
+      console.log(`[Storage] Using ${storageType}: bucket=${bucket}`);
+      
       const command = new PutObjectCommand({
-        Bucket: ENV.awsS3Bucket!,
+        Bucket: bucket,
         Key: key,
         Body: buffer,
         ContentType: contentType,
       });
       
-      await s3Client.send(command);
+      await client.send(command);
       
-      // Generate public URL or signed URL
-      const url = ENV.awsS3PublicUrl 
-        ? `${ENV.awsS3PublicUrl}/${key}`
-        : `https://${ENV.awsS3Bucket}.s3.${ENV.awsRegion}.amazonaws.com/${key}`;
+      // Generate public URL
+      let url: string;
+      if (publicUrl) {
+        url = `${publicUrl}/${key}`;
+      } else if (ENV.cloudflareAccountId && ENV.cloudflareR2PublicUrl) {
+        url = `${ENV.cloudflareR2PublicUrl}/${key}`;
+      } else if (ENV.backblazeKeyId && ENV.backblazePublicUrl) {
+        url = `${ENV.backblazePublicUrl}/${key}`;
+      } else if (region) {
+        // AWS S3 default URL format
+        url = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+      } else {
+        // Fallback: use bucket name as domain (for R2 with custom domain)
+        url = `https://${bucket}/${key}`;
+      }
       
-      console.log(`[Storage] AWS S3 upload successful: ${url}`);
+      console.log(`[Storage] ${storageType} upload successful: ${url}`);
       return { key, url };
     } catch (error) {
-      console.error(`[Storage] AWS S3 upload failed:`, error);
-      throw new Error(`AWS S3 upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(`[Storage] S3-compatible upload failed:`, error);
+      throw new Error(`Storage upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } else {
     // Fallback to Manus Forge API
@@ -223,21 +293,21 @@ export async function storagePut(
 export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
   const key = normalizeKey(relKey);
   
-  // Use AWS S3 if configured, otherwise use Manus Forge API
+  // Use S3-compatible storage if configured, otherwise use Manus Forge API
   if (isS3Configured()) {
     try {
-      const s3Client = getS3Client();
+      const { client, bucket } = getS3Client();
       const command = new GetObjectCommand({
-        Bucket: ENV.awsS3Bucket!,
+        Bucket: bucket,
         Key: key,
       });
       
       // Generate signed URL (valid for 1 hour)
-      const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      const url = await getSignedUrl(client, command, { expiresIn: 3600 });
       
       return { key, url };
     } catch (error) {
-      throw new Error(`AWS S3 get failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(`Storage get failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } else {
     // Fallback to Manus Forge API

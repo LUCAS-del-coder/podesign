@@ -4,13 +4,26 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   // OpenAI API key for Whisper transcription
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
-  // Storage configuration - AWS S3 (preferred)
+  // Storage configuration - AWS S3
   awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
   awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
   awsRegion: process.env.AWS_REGION ?? "",
   awsS3Bucket: process.env.AWS_S3_BUCKET ?? "",
   awsS3PublicUrl: process.env.AWS_S3_PUBLIC_URL ?? "", // Optional: custom public URL (e.g., CloudFront)
-  // Storage configuration - Manus Forge API (fallback/legacy)
+  // Storage configuration - Cloudflare R2 (S3-compatible, free 10GB)
+  cloudflareAccountId: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
+  cloudflareAccessKeyId: process.env.CLOUDFLARE_ACCESS_KEY_ID ?? "",
+  cloudflareSecretAccessKey: process.env.CLOUDFLARE_SECRET_ACCESS_KEY ?? "",
+  cloudflareR2Bucket: process.env.CLOUDFLARE_R2_BUCKET ?? "",
+  cloudflareR2PublicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL ?? "", // Optional: custom domain
+  // Storage configuration - Backblaze B2 (S3-compatible, free 10GB)
+  backblazeKeyId: process.env.BACKBLAZE_KEY_ID ?? "",
+  backblazeApplicationKey: process.env.BACKBLAZE_APPLICATION_KEY ?? "",
+  backblazeBucketName: process.env.BACKBLAZE_BUCKET_NAME ?? "",
+  backblazeRegion: process.env.BACKBLAZE_REGION ?? "us-west-004",
+  backblazeEndpoint: process.env.BACKBLAZE_ENDPOINT ?? "", // Optional: custom endpoint
+  backblazePublicUrl: process.env.BACKBLAZE_PUBLIC_URL ?? "", // Optional: custom public URL
+  // Storage configuration - Manus Forge API (fallback/legacy, currently not working)
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
 };
