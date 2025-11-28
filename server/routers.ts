@@ -175,12 +175,19 @@ export const appRouter = router({
           inputContent = articleUrl;
         }
 
-        // 建立任務記錄（目前只儲存 youtubeUrl，之後需要更新 schema）
+        // 建立任務記錄（確保儲存正確的 URL）
+        // 驗證：記錄實際儲存的 URL 以便追蹤
+        const urlToStore = inputType === 'youtube' ? inputContent : `[${inputType}] ${inputContent.substring(0, 100)}`;
+        console.log(`[CreateTask] Creating task with URL: ${urlToStore}`);
+        console.log(`[CreateTask] Input type: ${inputType}, User ID: ${ctx.user.id}`);
+        
         const taskId = await createPodcastTask({
           userId: ctx.user.id,
-          youtubeUrl: inputType === 'youtube' ? inputContent : `[${inputType}] ${inputContent.substring(0, 100)}`,
+          youtubeUrl: urlToStore,
           status: 'pending',
         });
+        
+        console.log(`[CreateTask] Task ${taskId} created successfully with URL: ${urlToStore}`);
 
         // 儲存使用者的聲音偏好（如果有提供）
         if (voiceId1 && voiceId2) {
