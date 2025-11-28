@@ -144,6 +144,41 @@ export async function storagePut(
     try {
       const { baseUrl, apiKey } = getStorageConfig();
       console.log(`[Storage] Using Manus Forge API: baseUrl=${baseUrl}`);
+      
+      // Try Connect Protocol format first (like other Manus APIs)
+      const baseUrlWithSlash = ensureTrailingSlash(baseUrl);
+      const connectUrl = new URL("storage.v1.StorageService/Upload", baseUrlWithSlash).toString();
+      
+      console.log(`[Storage] Trying Connect Protocol: ${connectUrl}`);
+      
+      // Convert data to base64 for JSON payload
+      const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
+      const base64Data = buffer.toString('base64');
+      
+      const connectResponse = await fetch(connectUrl, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "connect-protocol-version": "1",
+          authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          path: normalizeKey(key),
+          data: base64Data,
+          contentType: contentType,
+        }),
+      });
+      
+      if (connectResponse.ok) {
+        const result = await connectResponse.json();
+        const url = result.url || result.downloadUrl || `https://storage.manus.im/${key}`;
+        console.log(`[Storage] Manus Forge API (Connect Protocol) upload successful: ${url}`);
+        return { key, url };
+      }
+      
+      // If Connect Protocol fails, try REST API format (legacy)
+      console.log(`[Storage] Connect Protocol failed (${connectResponse.status}), trying REST API format...`);
       const uploadUrl = buildUploadUrl(baseUrl, key);
       console.log(`[Storage] Upload URL: ${uploadUrl.toString()}`);
       
@@ -151,16 +186,12 @@ export async function storagePut(
       
       // Log request details for debugging
       console.log(`[Storage] Uploading to: ${uploadUrl.toString()}`);
-      console.log(`[Storage] File size: ${(typeof data === 'string' ? Buffer.from(data).length : data.length) / 1024 / 1024}MB`);
+      console.log(`[Storage] File size: ${buffer.length / 1024 / 1024}MB`);
       console.log(`[Storage] Content type: ${contentType}`);
       
       const response = await fetch(uploadUrl, {
         method: "POST",
-        headers: {
-          ...buildAuthHeaders(apiKey),
-          // Some APIs require explicit content-type for form-data
-          // Note: Don't set Content-Type for FormData, browser will set it with boundary
-        },
+        headers: buildAuthHeaders(apiKey),
         body: formData,
       });
 
@@ -168,14 +199,16 @@ export async function storagePut(
         const message = await response.text().catch(() => response.statusText);
         console.error(`[Storage] Manus Forge API upload failed: ${response.status} ${response.statusText}`);
         console.error(`[Storage] Error message: ${message}`);
+        console.error(`[Storage] Tried both Connect Protocol and REST API formats`);
         throw new Error(
           `Manus Forge API upload failed (${response.status} ${response.statusText}): ${message}. ` +
-          `Please check BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are correct.`
+          `Tried both Connect Protocol (storage.v1.StorageService/Upload) and REST API (v1/storage/upload) formats. ` +
+          `Please check BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are correct, or consider using AWS S3.`
         );
       }
       const result = await response.json();
       const url = result.url;
-      console.log(`[Storage] Manus Forge API upload successful: ${url}`);
+      console.log(`[Storage] Manus Forge API (REST API) upload successful: ${url}`);
       return { key, url };
     } catch (error) {
       if (error instanceof Error && error.message.includes('Storage proxy credentials missing')) {
@@ -208,10 +241,40 @@ export async function storageGet(relKey: string): Promise<{ key: string; url: st
     }
   } else {
     // Fallback to Manus Forge API
-    const { baseUrl, apiKey } = getStorageConfig();
-    return {
-      key,
-      url: await buildDownloadUrl(baseUrl, key, apiKey),
-    };
+    try {
+      const { baseUrl, apiKey } = getStorageConfig();
+      
+      // Try Connect Protocol format first
+      const baseUrlWithSlash = ensureTrailingSlash(baseUrl);
+      const connectUrl = new URL("storage.v1.StorageService/GetDownloadUrl", baseUrlWithSlash).toString();
+      
+      const connectResponse = await fetch(connectUrl, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          "connect-protocol-version": "1",
+          authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          path: normalizeKey(key),
+        }),
+      });
+      
+      if (connectResponse.ok) {
+        const result = await connectResponse.json();
+        const url = result.url || result.downloadUrl || `https://storage.manus.im/${key}`;
+        return { key, url };
+      }
+      
+      // Fallback to REST API format
+      return {
+        key,
+        url: await buildDownloadUrl(baseUrl, key, apiKey),
+      };
+    } catch (error) {
+      console.error(`[Storage] Get download URL failed:`, error);
+      throw error;
+    }
   }
 }
