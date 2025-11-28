@@ -82,7 +82,13 @@ AWS_S3_PUBLIC_URL=https://your-cdn-domain.com（選用）
 BUILT_IN_FORGE_API_URL=https://api.manus.im
 BUILT_IN_FORGE_API_KEY=你的-manus-forge-api-key
 ```
-**注意：** 系統會自動選擇：如果配置了 AWS S3，優先使用 S3；否則使用 Manus Forge API。
+**如何取得：**
+- 詳細步驟請參考 [MANUS_FORGE_SETUP.md](./MANUS_FORGE_SETUP.md)
+- 需要 Manus 帳號並取得 Forge API Key
+
+**注意：** 
+- 系統會自動選擇：如果配置了 AWS S3，優先使用 S3；否則使用 Manus Forge API
+- 如果只想使用 Manus Forge API，請**不要設定** AWS S3 相關環境變數
 
 ## 選用環境變數（可選）
 
