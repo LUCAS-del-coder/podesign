@@ -628,7 +628,16 @@ Video ID: ${videoId}
 
       // 嚴格驗證：檢查返回的 videoId 是否匹配
       const returnedVideoId = result.videoId || "";
-      if (returnedVideoId && returnedVideoId !== videoId) {
+      
+      // **關鍵修復**：如果沒有返回 videoId，強制回退到傳統方式（確保正確性）
+      if (!returnedVideoId || returnedVideoId.trim().length === 0) {
+        console.error(`[YouTube] ❌ Gemini did not return videoId field. This is required for verification.`);
+        console.error(`[YouTube] ❌ Falling back to traditional method to ensure correctness.`);
+        throw new Error("Gemini did not return videoId field - required for verification");
+      }
+      
+      // 驗證返回的 videoId 是否匹配
+      if (returnedVideoId !== videoId) {
         console.error(`[YouTube] ❌ Video ID mismatch! Expected: ${videoId}, Got: ${returnedVideoId}`);
         console.error(`[YouTube] ❌ This indicates Gemini analyzed a different video. Falling back to traditional method.`);
         throw new Error(`Video ID mismatch: expected ${videoId}, got ${returnedVideoId}`);
@@ -637,15 +646,13 @@ Video ID: ${videoId}
       // 驗證：檢查返回的標題是否合理
       const returnedTitle = result.title || "";
       if (!returnedTitle || returnedTitle.trim().length === 0) {
-        console.warn(`[YouTube] ⚠️  Warning: Returned title is empty`);
+        console.error(`[YouTube] ❌ Warning: Returned title is empty`);
         throw new Error("Gemini returned empty title");
       }
       
-      // 如果沒有 videoId 欄位，記錄警告但繼續（因為有些模型可能不返回）
-      if (!returnedVideoId) {
-        console.warn(`[YouTube] ⚠️  Warning: Gemini did not return videoId field. Title: "${returnedTitle}"`);
-        console.warn(`[YouTube] ⚠️  Proceeding with caution - if content seems wrong, will fallback to traditional method.`);
-      }
+      // 所有驗證通過
+      console.log(`[YouTube] ✅ Video ID verification passed: ${videoId}`);
+      console.log(`[YouTube] ✅ Title: ${returnedTitle}`);
       
       console.log(`[YouTube] ✅ Gemini 直接分析成功（使用模型：${modelName}）`);
       console.log(`[YouTube] ✅ Video ID: ${videoId}, Title: ${returnedTitle}`);
