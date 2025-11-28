@@ -28,8 +28,19 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
-  // 診斷環境變數
-  console.log("[Startup] Environment variables check:");
+  // 驗證環境變數（在啟動前檢查）
+  try {
+    const { assertEnvironmentVariables } = await import("./validateEnv");
+    assertEnvironmentVariables();
+    console.log("[Startup] ✅ 環境變數驗證通過");
+  } catch (error) {
+    console.error("[Startup] ❌ 環境變數驗證失敗:");
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  }
+
+  // 診斷環境變數（僅顯示已設定狀態，不顯示值）
+  console.log("[Startup] Environment variables status:");
   console.log("[Startup] DATABASE_URL:", process.env.DATABASE_URL ? "Set (hidden)" : "NOT SET");
   console.log("[Startup] JWT_SECRET:", process.env.JWT_SECRET ? "Set (hidden)" : "NOT SET");
   console.log("[Startup] GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID ? "Set (hidden)" : "NOT SET");

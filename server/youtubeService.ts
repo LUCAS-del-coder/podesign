@@ -7,6 +7,7 @@
 import { transcribeAudio } from "./_core/voiceTranscription";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -418,6 +419,7 @@ ${truncatedTranscription}`;
 
 /**
  * 使用 Gemini 直接分析 YouTube URL（快速方式，跳過下載和轉錄）
+ * 使用官方 SDK，與 llm.ts 保持一致
  */
 async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
   transcription: string;
@@ -428,8 +430,6 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
 }> {
   console.log(`[YouTube] 使用 Gemini 直接分析 YouTube URL: ${youtubeUrl}`);
   
-  // 使用 Gemini API 直接分析 YouTube URL
-  // 注意：需要使用特殊的格式來傳遞 YouTube URL
   const { ENV } = await import("./_core/env");
   
   if (!ENV.googleGeminiApiKey) {
@@ -446,76 +446,49 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
   "podcastScript": "第三人稱 Podcast 腳本（含 intro、主要內容、outro）"
 }`;
 
-  // 嘗試多個模型和 API 版本（基於成功案例）
-  // 成功案例主要使用：gemini-1.5-pro-latest, gemini-2.0-flash
-  // 優先使用 v1beta API（成功案例主要使用此版本）
-  const modelConfigs = [
-    { version: "v1beta", name: "gemini-2.0-flash" },
-    { version: "v1beta", name: "gemini-1.5-pro-latest" },
-    { version: "v1beta", name: "gemini-1.5-flash-latest" },
-    { version: "v1beta", name: "gemini-1.5-pro" },
-    { version: "v1", name: "gemini-1.5-pro-latest" },
-    { version: "v1beta", name: "gemini-1.5-flash" },
+  const userPrompt = `請分析這個 YouTube 影片並生成繁體中文 Podcast 內容。影片網址：${youtubeUrl}\n\n請直接觀看影片內容並以 JSON 格式回應。`;
+
+  // 使用官方 SDK，與 llm.ts 保持一致
+  const client = new GoogleGenerativeAI(ENV.googleGeminiApiKey);
+  
+  // 嘗試多個模型（與 llm.ts 使用相同的模型列表）
+  const modelNames = [
+    "gemini-2.0-flash-exp", // Experimental, latest
+    "gemini-2.0-flash",
+    "gemini-1.5-pro-latest", // Fallback (may still work)
   ];
   
   let lastError: Error | null = null;
   
-  for (const { version, name } of modelConfigs) {
+  for (const modelName of modelNames) {
     try {
-      const apiUrl = `https://generativelanguage.googleapis.com/${version}/models/${name}:generateContent?key=${ENV.googleGeminiApiKey}`;
-      console.log(`[YouTube] Trying Gemini model: ${version}/${name}`);
+      console.log(`[YouTube] Trying Gemini model: ${modelName}`);
       
-      const payload = {
-        contents: [{
-          parts: [
-            { text: systemPrompt },
-            { 
-              text: `請分析這個 YouTube 影片並生成繁體中文 Podcast 內容。影片網址：${youtubeUrl}\n\n請直接觀看影片內容並以 JSON 格式回應。`
-            }
-          ]
-        }],
+      const model = client.getGenerativeModel({ 
+        model: modelName,
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 4096,
         },
-      };
-
-      const response = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify(payload),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        const errorJson = JSON.parse(errorText);
-        
-        if (errorJson.error?.code === 404) {
-          console.log(`[YouTube] Model ${version}/${name} not found, trying next...`);
-          lastError = new Error(`Model ${version}/${name} not found`);
-          continue;
-        } else {
-          throw new Error(`Gemini API failed: ${response.status} ${response.statusText} – ${errorText}`);
-        }
-      }
       
-      // 成功，使用這個回應
-      const geminiResponse = await response.json();
-      const content = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+      // 組合提示詞
+      const prompt = `${systemPrompt}\n\n${userPrompt}`;
       
-      if (!content) {
+      const response = await model.generateContent(prompt);
+      const responseText = response.response.text();
+      
+      if (!responseText) {
         throw new Error("Gemini 未返回內容");
       }
 
       // 解析 JSON 回應
       let result;
       try {
-        result = JSON.parse(content);
+        result = JSON.parse(responseText);
       } catch (parseError) {
         // 如果解析失敗，嘗試提取 JSON 部分
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           result = JSON.parse(jsonMatch[0]);
         } else {
@@ -528,7 +501,7 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         throw new Error("Gemini 回應格式不正確，缺少必要欄位");
       }
 
-      console.log(`[YouTube] Gemini 直接分析成功（使用模型：${version}/${name}）`);
+      console.log(`[YouTube] Gemini 直接分析成功（使用模型：${modelName}）`);
       
       return {
         transcription: result.transcription || result.summary || "（由 AI 分析生成）",
@@ -537,9 +510,19 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         language: "zh",
         title: result.title,
       };
-    } catch (error) {
+    } catch (error: any) {
+      console.warn(`[YouTube] Model ${modelName} failed:`, error.message || error);
       lastError = error instanceof Error ? error : new Error(String(error));
-      continue;
+      
+      // 如果是 404 或模型不存在錯誤，嘗試下一個模型
+      if (error.message?.includes("404") || 
+          error.message?.includes("not found") || 
+          error.message?.includes("NOT_FOUND")) {
+        continue;
+      }
+      
+      // 其他錯誤直接拋出
+      throw error;
     }
   }
   
