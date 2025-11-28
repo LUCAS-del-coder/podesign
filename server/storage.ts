@@ -31,22 +31,25 @@ function getS3Client(): { client: S3Client; bucket: string; region?: string; pub
     // Trim whitespace from credentials (common issue when copying)
     const accessKeyId = ENV.cloudflareAccessKeyId.trim();
     const secretAccessKey = ENV.cloudflareSecretAccessKey.trim();
+    const accountId = ENV.cloudflareAccountId.trim();
+    const bucket = ENV.cloudflareR2Bucket.trim();
     
-    // Validate Access Key ID length (should be 32 characters for R2)
-    if (accessKeyId.length !== 32) {
-      throw new Error(`Cloudflare R2 Access Key ID must be 32 characters, got ${accessKeyId.length}. Please check CLOUDFLARE_ACCESS_KEY_ID.`);
-    }
+    // Log for debugging (without exposing full keys)
+    console.log(`[Storage] Cloudflare R2 config - Account ID: ${accountId.substring(0, 8)}..., Access Key ID length: ${accessKeyId.length}, Bucket: ${bucket}`);
+    
+    // Note: Cloudflare R2 Access Key ID can vary in length (typically 20 chars, but may be different)
+    // AWS SDK might have issues with non-standard lengths, so we'll let it try
     
     return {
       client: new S3Client({
         region: 'auto',
-        endpoint: `https://${ENV.cloudflareAccountId}.r2.cloudflarestorage.com`,
+        endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
         credentials: {
           accessKeyId: accessKeyId,
           secretAccessKey: secretAccessKey,
         },
       }),
-      bucket: ENV.cloudflareR2Bucket.trim(),
+      bucket: bucket,
       publicUrl: ENV.cloudflareR2PublicUrl?.trim(),
     };
   }

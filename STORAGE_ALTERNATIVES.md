@@ -34,7 +34,10 @@
      - **Permissions**：選擇 **Object Read & Write**
      - **TTL**：留空（永久有效）或設定到期時間
    - 點擊 **Create API Token**
-   - **重要**：立即複製 **Access Key ID** 和 **Secret Access Key**（只會顯示一次！）
+   - **重要**：立即複製 **S3 Client Credentials** 中的：
+     - **Access Key ID**（通常是 20 個字元，但可能不同）
+     - **Secret Access Key**（通常是 64 個字元）
+   - **注意**：不要複製「Cloudflare API Token」，要複製「S3 Client Credentials」！
 
 4. **取得 Account ID**
    - 在 Cloudflare Dashboard 右側，可以看到 **Account ID**
