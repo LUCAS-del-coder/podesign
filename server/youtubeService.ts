@@ -353,52 +353,29 @@ export async function analyzePodcastContent(transcription: string): Promise<{
   podcastScript: string;
 }> {
   try {
-    const systemPrompt = `你是一位專業的 Podcast 內容編輯。你的任務是將 YouTube 影片的逐字稿轉換為高品質的中文 Podcast 內容。
+    // 簡化提示詞以提高處理速度
+    const systemPrompt = `你是專業的 Podcast 編輯。將逐字稿轉為繁體中文 Podcast 內容。
 
-**重要：無論輸入的逐字稿是什麼語言（英文、日文、韓文等），你都必須輸出繁體中文。**
+輸出 JSON：{"summary": "200-300字摘要", "podcastScript": "第三人稱腳本（含 intro、主要內容、outro）"}`;
 
-請根據提供的逐字稿完成以下任務：
-1. 產生一個精華摘要（200-300字），提煉出最重要的觀點和資訊（必須使用繁體中文）
-2. 將逐字稿改寫為第三人稱的 Podcast 腳本（必須使用繁體中文），包含：
-   - 開場白（intro）：簡短介紹本集主題
-   - 主要內容：用流暢的第三人稱敘事方式呈現核心內容
-   - 結尾（outro）：總結重點並感謝收聽
+    // 如果逐字稿太長，只取前 8000 字元以加快處理
+    const maxLength = 8000;
+    const truncatedTranscription = transcription.length > maxLength 
+      ? transcription.substring(0, maxLength) + "...（內容已截斷）"
+      : transcription;
 
-請以 JSON 格式回應，包含 summary 和 podcastScript 兩個欄位。`;
+    const userPrompt = `分析以下逐字稿，輸出繁體中文 JSON：
 
-    const userPrompt = `請分析以下逐字稿並產生繁體中文的摘要與 Podcast 腳本：
-
-逐字稿：
-${transcription}
-
-請記住：必須使用繁體中文輸出所有內容。`;
+${truncatedTranscription}`;
 
     const response = await invokeLLM({
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
+      // 使用 json_object 格式（OpenAI 支援，更快）
       response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: "podcast_analysis",
-          strict: true,
-          schema: {
-            type: "object",
-            properties: {
-              summary: {
-                type: "string",
-                description: "繁體中文的精華摘要，200-300字",
-              },
-              podcastScript: {
-                type: "string",
-                description: "繁體中文的第三人稱 Podcast 腳本，包含 intro、主要內容和 outro",
-              },
-            },
-            required: ["summary", "podcastScript"],
-            additionalProperties: false,
-          },
-        },
+        type: "json_object",
       },
     });
 
@@ -409,7 +386,26 @@ ${transcription}
 
     // content 可能是 string 或 array，需要處理
     const contentStr = typeof content === "string" ? content : JSON.stringify(content);
-    const result = JSON.parse(contentStr);
+    
+    // 嘗試解析 JSON
+    let result;
+    try {
+      result = JSON.parse(contentStr);
+    } catch (parseError) {
+      // 如果解析失敗，嘗試提取 JSON 部分
+      const jsonMatch = contentStr.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("無法解析 LLM 回應為 JSON");
+      }
+    }
+    
+    // 驗證結果格式
+    if (!result.summary || !result.podcastScript) {
+      throw new Error("LLM 回應格式不正確，缺少 summary 或 podcastScript");
+    }
+    
     return {
       summary: result.summary,
       podcastScript: result.podcastScript,
@@ -438,10 +434,14 @@ export async function processYoutubeToPodcast(youtubeUrl: string): Promise<{
   }
 
   // 步驟 1: 下載並轉錄影片
+  console.log(`[YouTube] 開始處理: ${youtubeUrl}`);
   const transcriptionResult = await transcribeYoutubeVideo(youtubeUrl);
+  console.log(`[YouTube] 轉錄完成，文字長度: ${transcriptionResult.text.length} 字元`);
 
-  // 步驟 2: 分析內容並產生摘要與腳本
+  // 步驟 2: 分析內容並產生摘要與腳本（優化：使用較短的提示詞）
+  console.log(`[YouTube] 開始分析內容...`);
   const analysisResult = await analyzePodcastContent(transcriptionResult.text);
+  console.log(`[YouTube] 內容分析完成`);
 
   return {
     transcription: transcriptionResult.text,

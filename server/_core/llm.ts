@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import OpenAI from "openai";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -209,14 +210,38 @@ const normalizeToolChoice = (
   return toolChoice;
 };
 
+// Initialize OpenAI client for LLM calls
+let openaiClient: OpenAI | null = null;
+
+const getOpenAIClient = (): OpenAI => {
+  if (openaiClient) {
+    return openaiClient;
+  }
+  
+  if (ENV.openaiApiKey) {
+    openaiClient = new OpenAI({
+      apiKey: ENV.openaiApiKey,
+      timeout: 120000, // 2 minutes timeout
+    });
+    return openaiClient;
+  }
+  
+  // Fallback to Manus Forge API if OpenAI is not configured
+  if (!ENV.forgeApiKey) {
+    throw new Error("Either OPENAI_API_KEY or BUILT_IN_FORGE_API_KEY must be configured");
+  }
+  
+  return null as any; // Will use fetch for Manus API
+}
+
 const resolveApiUrl = () =>
   ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
     ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
     : "https://forge.manus.im/v1/chat/completions";
 
 const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("BUILT_IN_FORGE_API_KEY is not configured");
+  if (!ENV.openaiApiKey && !ENV.forgeApiKey) {
+    throw new Error("Either OPENAI_API_KEY or BUILT_IN_FORGE_API_KEY must be configured");
   }
 };
 
@@ -279,6 +304,86 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     response_format,
   } = params;
 
+  // Use OpenAI if available, otherwise fallback to Manus Forge API
+  if (ENV.openaiApiKey) {
+    try {
+      const client = getOpenAIClient();
+      
+      // Convert messages format for OpenAI
+      const openaiMessages = messages.map(msg => {
+        const normalized = normalizeMessage(msg);
+        return {
+          role: normalized.role as "system" | "user" | "assistant",
+          content: typeof normalized.content === "string" 
+            ? normalized.content 
+            : JSON.stringify(normalized.content),
+        };
+      });
+
+      const normalizedResponseFormat = normalizeResponseFormat({
+        responseFormat,
+        response_format,
+        outputSchema,
+        output_schema,
+      });
+
+      const completionParams: any = {
+        model: "gpt-4o-mini", // Fast and cost-effective
+        messages: openaiMessages,
+        max_tokens: 4096, // Reduced for faster response
+        temperature: 0.7,
+      };
+
+      // Handle response format
+      if (normalizedResponseFormat) {
+        if (normalizedResponseFormat.type === "json_object") {
+          completionParams.response_format = { type: "json_object" };
+        } else if (normalizedResponseFormat.type === "json_schema") {
+          // OpenAI doesn't support json_schema directly, use json_object and parse
+          completionParams.response_format = { type: "json_object" };
+        }
+      }
+
+      const completion = await client.chat.completions.create(completionParams);
+      
+      // Convert OpenAI response to our format
+      const result: InvokeResult = {
+        id: completion.id,
+        created: completion.created,
+        model: completion.model,
+        choices: completion.choices.map(choice => ({
+          index: choice.index,
+          message: {
+            role: choice.message.role as Role,
+            content: choice.message.content || "",
+            tool_calls: choice.message.tool_calls?.map(tc => ({
+              id: tc.id,
+              type: "function" as const,
+              function: {
+                name: tc.function.name,
+                arguments: typeof tc.function.arguments === "string" 
+                  ? tc.function.arguments 
+                  : JSON.stringify(tc.function.arguments),
+              },
+            })),
+          },
+          finish_reason: choice.finish_reason || null,
+        })),
+        usage: completion.usage ? {
+          prompt_tokens: completion.usage.prompt_tokens,
+          completion_tokens: completion.usage.completion_tokens,
+          total_tokens: completion.usage.total_tokens,
+        } : undefined,
+      };
+
+      return result;
+    } catch (error) {
+      console.error("[LLM] OpenAI API error, falling back to Manus Forge API:", error);
+      // Fall through to Manus API
+    }
+  }
+
+  // Fallback to Manus Forge API
   const payload: Record<string, unknown> = {
     model: "gemini-2.5-flash",
     messages: messages.map(normalizeMessage),

@@ -26,4 +26,6 @@ export const ENV = {
   // Storage configuration - Manus Forge API (fallback/legacy, currently not working)
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  // OpenAI API for LLM (alternative to Manus Forge API)
+  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
 };

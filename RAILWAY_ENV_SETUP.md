@@ -57,6 +57,19 @@ ASSEMBLYAI_API_KEY=你的-assemblyai-api-key
 
 **注意：** AssemblyAI 提供更穩定的連線，適合 Railway 部署環境。
 
+### 5. OpenAI API（LLM 分析，用於生成摘要和腳本）
+```
+OPENAI_API_KEY=你的-openai-api-key
+```
+**如何取得：**
+1. 前往 [OpenAI Platform](https://platform.openai.com/)
+2. 登入或註冊帳號
+3. 前往 **API Keys** 頁面
+4. 建立新的 API Key
+5. 複製並妥善保存
+
+**注意：** 如果沒有設定，系統會嘗試使用 Manus Forge API（可能無法使用）。
+
 ### 6. ListenHub TTS API
 ```
 LISTENHUB_API_KEY=你的-listenhub-api-key
