@@ -228,11 +228,13 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
 
     console.log(`[YouTube] 音訊檔案大小: ${sizeMB.toFixed(2)}MB`);
 
-      // 檢查檔案大小（AssemblyAI 限制較寬鬆，但建議不超過 25MB 以確保穩定）
-      if (sizeMB > 25) {
+      // 檢查檔案大小（AssemblyAI 支援更大的檔案，提高限制到 50MB）
+      // 注意：更大的檔案可能需要更長的處理時間
+      const MAX_FILE_SIZE_MB = 50;
+      if (sizeMB > MAX_FILE_SIZE_MB) {
       throw new Error(
-          `音訊檔案過大 (${sizeMB.toFixed(2)}MB)，超過 25MB 限制。` +
-          `請選擇較短的影片（建議 40 分鐘以內）或使用文字輸入功能。`
+          `音訊檔案過大 (${sizeMB.toFixed(2)}MB)，超過 ${MAX_FILE_SIZE_MB}MB 限制。` +
+          `請選擇較短的影片（建議 80 分鐘以內）或使用文字輸入功能。`
       );
     }
 

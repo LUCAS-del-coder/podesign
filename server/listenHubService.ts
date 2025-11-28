@@ -194,9 +194,9 @@ export async function getPodcastEpisode(
 }
 
 /**
- * 輪詢等待 Episode 完成
+ * 輪詢等待 Episode 完成（優化版本：更快的響應速度）
  * @param episodeId Episode ID
- * @param maxWaitTime 最長等待時間（毫秒），預設 10 分鐘
+ * @param maxWaitTime 最長等待時間（毫秒），預設 20 分鐘
  * @returns 完成的 Episode
  */
 export async function waitForPodcastCompletion(
@@ -207,8 +207,13 @@ export async function waitForPodcastCompletion(
 
   console.log(`[ListenHub] Waiting for episode ${episodeId} to complete...`);
 
-  // 先等待 60 秒再開始查詢
-  await new Promise((resolve) => setTimeout(resolve, 60000));
+  // 優化：減少初始等待時間（從 60 秒改為 30 秒）
+  // 因為 ListenHub 通常在 30-60 秒內完成 quick 模式，deep 模式可能需要更長時間
+  await new Promise((resolve) => setTimeout(resolve, 30000));
+
+  // 使用動態輪詢間隔：開始時頻繁查詢，之後逐漸延長
+  let pollInterval = 5000; // 初始 5 秒
+  let consecutivePendingCount = 0;
 
   while (Date.now() - startTime < maxWaitTime) {
     const episode = await getPodcastEpisode(episodeId);
@@ -224,8 +229,26 @@ export async function waitForPodcastCompletion(
       );
     }
 
-    // 每 10 秒查詢一次
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    // 如果仍然是 pending，增加計數
+    consecutivePendingCount++;
+    
+    // 動態調整輪詢間隔：
+    // - 前 3 次：每 5 秒查詢（快速響應）
+    // - 4-10 次：每 10 秒查詢（正常速度）
+    // - 之後：每 15 秒查詢（節省 API 調用）
+    if (consecutivePendingCount <= 3) {
+      pollInterval = 5000; // 5 秒
+    } else if (consecutivePendingCount <= 10) {
+      pollInterval = 10000; // 10 秒
+    } else {
+      pollInterval = 15000; // 15 秒
+    }
+
+    const elapsed = Date.now() - startTime;
+    const elapsedSeconds = Math.floor(elapsed / 1000);
+    console.log(`[ListenHub] Episode ${episodeId} still processing... (${elapsedSeconds}s elapsed, checking again in ${pollInterval/1000}s)`);
+
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
   }
 
   throw new Error("Episode generation timeout");
