@@ -24,25 +24,27 @@ function isSecureRequest(req: Request) {
 export function getSessionCookieOptions(
   req: Request
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  // const hostname = req.hostname;
-  // const shouldSetDomain =
-  //   hostname &&
-  //   !LOCAL_HOSTS.has(hostname) &&
-  //   !isIpAddress(hostname) &&
-  //   hostname !== "127.0.0.1" &&
-  //   hostname !== "::1";
+  const hostname = req.hostname;
+  const isSecure = isSecureRequest(req);
+  
+  // 在生產環境（Railway）中，通常需要 secure cookie
+  // Railway 會透過 proxy 轉發，所以需要檢查 x-forwarded-proto
+  const shouldSetDomain =
+    hostname &&
+    !LOCAL_HOSTS.has(hostname) &&
+    !isIpAddress(hostname) &&
+    hostname !== "127.0.0.1" &&
+    hostname !== "::1";
 
-  // const domain =
-  //   shouldSetDomain && !hostname.startsWith(".")
-  //     ? `.${hostname}`
-  //     : shouldSetDomain
-  //       ? hostname
-  //       : undefined;
+  // 對於 Railway，不設定 domain 讓 cookie 在整個網域下可用
+  // 如果需要跨子網域，可以設定 domain
+  const domain = undefined; // Railway 通常不需要設定 domain
 
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    sameSite: isSecure ? "none" : "lax", // 生產環境用 none，開發環境用 lax
+    secure: isSecure, // Railway 上應該是 true
+    ...(domain && { domain }),
   };
 }

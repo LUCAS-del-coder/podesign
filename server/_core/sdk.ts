@@ -73,10 +73,15 @@ class SDKServer {
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     
+    if (!sessionCookie) {
+      console.log("[Auth] No session cookie found");
+      throw ForbiddenError("No session cookie");
+    }
+    
     // 嘗試驗證帳號密碼登入的 JWT
     try {
       const secretKey = this.getSessionSecret();
-      const { payload } = await jwtVerify(sessionCookie ?? "", secretKey, {
+      const { payload } = await jwtVerify(sessionCookie, secretKey, {
         algorithms: ["HS256"],
       });
       
@@ -89,18 +94,21 @@ class SDKServer {
           const { eq } = await import('drizzle-orm');
           const result = await dbInstance.select().from(users).where(eq(users.id, payload.userId)).limit(1);
           if (result.length > 0) {
+            console.log("[Auth] Authenticated via username/password:", payload.userId);
             return result[0];
           }
         }
       }
     } catch (error) {
       // 不是帳號密碼登入的 JWT，繼續嘗試 OAuth
+      console.log("[Auth] Not a username/password JWT, trying OAuth session");
     }
     
     // 驗證 session（支援帳號密碼和 Google OAuth）
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
+      console.log("[Auth] Session verification failed");
       throw ForbiddenError("Invalid session cookie");
     }
 
@@ -109,15 +117,12 @@ class SDKServer {
     let user = await db.getUserByOpenId(sessionUserId);
 
     // 如果用戶不在資料庫中（Google OAuth 新用戶），需要從 session 中取得資訊
-    if (!user && session) {
-      // 從 session payload 中取得用戶資訊（Google OAuth 已在 callback 中儲存）
-      // 這裡只需要確保用戶存在，如果不存在可能是 session 損壞
+    if (!user) {
       console.warn("[Auth] User not found in DB but session exists:", sessionUserId);
+      throw ForbiddenError("User not found in database");
     }
 
-    if (!user) {
-      throw ForbiddenError("User not found");
-    }
+    console.log("[Auth] Authenticated user:", { id: user.id, openId: user.openId, name: user.name });
 
     await db.upsertUser({
       openId: user.openId,

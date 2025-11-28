@@ -62,7 +62,20 @@ export function registerOAuthRoutes(app: Express) {
 
       // 設定 cookie
       const cookieOptions = getSessionCookieOptions(req);
+      console.log("[GoogleOAuth] Setting cookie with options:", {
+        httpOnly: cookieOptions.httpOnly,
+        secure: cookieOptions.secure,
+        sameSite: cookieOptions.sameSite,
+        path: cookieOptions.path,
+      });
+      
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      
+      console.log("[GoogleOAuth] User authenticated successfully:", {
+        openId: userInfo.id,
+        name: userInfo.name,
+        email: userInfo.email,
+      });
 
       res.redirect(302, "/");
     } catch (error) {
