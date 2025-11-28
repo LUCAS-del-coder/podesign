@@ -137,36 +137,10 @@ export async function transcribeAudio(
     }
     
     console.log(`[AssemblyAI] Submitting transcription job...`);
-    const transcript = await client.transcripts.transcribe(transcriptParams);
+    // AssemblyAI SDK automatically handles polling and returns the completed transcript
+    const finalTranscript = await client.transcripts.transcribe(transcriptParams);
     
-    // Step 4: Poll for completion (AssemblyAI handles this internally, but we can check status)
-    console.log(`[AssemblyAI] Transcription job submitted, ID: ${transcript.id}`);
-    console.log(`[AssemblyAI] Status: ${transcript.status}`);
-    
-    // Wait for transcription to complete
-    // The SDK should handle polling, but we'll wait for the result
-    let finalTranscript = transcript;
-    const maxWaitTime = 600000; // 10 minutes
-    const startTime = Date.now();
-    const pollInterval = 3000; // Poll every 3 seconds
-    
-    while (finalTranscript.status === 'queued' || finalTranscript.status === 'processing') {
-      if (Date.now() - startTime > maxWaitTime) {
-        return {
-          error: "Transcription timeout",
-          code: "SERVICE_ERROR",
-          details: "Transcription took too long to complete"
-        };
-      }
-      
-      console.log(`[AssemblyAI] Polling... Status: ${finalTranscript.status}`);
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
-      
-      // Get updated transcript
-      finalTranscript = await client.transcripts.get(finalTranscript.id);
-    }
-    
-    // Step 5: Check for errors
+    // Step 4: Check for errors
     if (finalTranscript.status === 'error') {
       const errorMsg = finalTranscript.error || 'Unknown error';
       console.error(`[AssemblyAI] Transcription failed: ${errorMsg}`);
@@ -187,7 +161,7 @@ export async function transcribeAudio(
     
     console.log(`[AssemblyAI] Transcription successful! Language: ${finalTranscript.language_code}, Duration: ${finalTranscript.audio_duration ? Math.round(finalTranscript.audio_duration / 1000) : 0}s`);
     
-    // Step 6: Convert AssemblyAI response to our format
+    // Step 5: Convert AssemblyAI response to our format
     const segments: WhisperSegment[] = (finalTranscript.words || []).map((word: any, idx: number) => ({
       id: idx,
       seek: word.start / 1000, // Convert ms to seconds
