@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Loader2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { APP_TITLE } from "@/const";
 
 interface LayoutProps {
   children: ReactNode;
