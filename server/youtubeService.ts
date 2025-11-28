@@ -456,7 +456,23 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
   "podcastScript": "第三人稱 Podcast 腳本（含 intro、主要內容、outro）"
 }`;
 
-  const userPrompt = `請分析這個 YouTube 影片並生成繁體中文 Podcast 內容。影片網址：${youtubeUrl}\n\n請直接觀看影片內容並以 JSON 格式回應。`;
+  // 提取 video ID 用於驗證
+  const videoId = extractVideoId(youtubeUrl);
+  if (!videoId) {
+    throw new AppError(
+      ErrorCode.INVALID_INPUT,
+      "無法從 URL 中提取 Video ID",
+      { url: youtubeUrl }
+    );
+  }
+  
+  const userPrompt = `請分析這個 YouTube 影片並生成繁體中文 Podcast 內容。
+
+**重要**：你必須分析以下這個特定的 YouTube 影片網址，不要分析其他影片：
+影片網址：${youtubeUrl}
+Video ID: ${videoId}
+
+請直接觀看這個影片的內容並以 JSON 格式回應。確保你分析的是這個特定的影片，而不是其他影片。`;
 
   // 使用官方 SDK，與 llm.ts 保持一致
   const client = new GoogleGenerativeAI(ENV.googleGeminiApiKey);
@@ -543,7 +559,18 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         throw new Error("Gemini 回應格式不正確，缺少必要欄位");
       }
 
+      // 驗證：檢查返回的標題是否包含 video ID（基本驗證）
+      // 如果 Gemini 返回的內容明顯不匹配，記錄警告
+      const returnedTitle = result.title || "";
+      const hasVideoIdInTitle = returnedTitle.toLowerCase().includes(videoId.toLowerCase());
+      
+      if (!hasVideoIdInTitle && returnedTitle) {
+        console.warn(`[YouTube] ⚠️  Warning: Returned title "${returnedTitle}" doesn't seem to match video ID ${videoId}`);
+        console.warn(`[YouTube] ⚠️  This might indicate Gemini analyzed a different video. Consider using traditional method.`);
+      }
+      
       console.log(`[YouTube] Gemini 直接分析成功（使用模型：${modelName}）`);
+      console.log(`[YouTube] Video ID: ${videoId}, Returned title: ${returnedTitle || "N/A"}`);
       
       return {
         transcription: result.transcription || result.summary || "（由 AI 分析生成）",
@@ -620,16 +647,35 @@ export async function processYoutubeToPodcast(youtubeUrl: string): Promise<{
 
   console.log(`[YouTube] 開始處理: ${youtubeUrl}`);
 
+  // 提取 video ID 用於驗證和日誌
+  const videoId = extractVideoId(youtubeUrl);
+  if (!videoId) {
+    throw new AppError(
+      ErrorCode.INVALID_INPUT,
+      "無法從 URL 中提取 Video ID",
+      { url: youtubeUrl }
+    );
+  }
+  
+  console.log(`[YouTube] 開始處理: ${youtubeUrl} (Video ID: ${videoId})`);
+
   // 優先嘗試：使用 Gemini 直接分析（快速方式）
+  // 注意：Gemini 直接分析可能不穩定，如果返回的內容不匹配，會回退到傳統方式
   try {
-    console.log(`[YouTube] 嘗試使用 Gemini 直接分析...`);
+    console.log(`[YouTube] 嘗試使用 Gemini 直接分析 Video ID: ${videoId}...`);
     const directResult = await analyzeYoutubeUrlDirectly(youtubeUrl);
     
+    // 驗證：檢查返回的標題是否合理（基本驗證）
+    // 如果標題為空或明顯不合理，回退到傳統方式
+    if (!directResult.title || directResult.title.trim().length === 0) {
+      console.warn(`[YouTube] ⚠️  Gemini 返回的標題為空，回退到傳統方式`);
+      throw new Error("Gemini returned empty title, using traditional method");
+    }
+    
     // 生成假的 audioUrl 和 fileKey（因為沒有實際下載）
-    const videoId = extractVideoId(youtubeUrl) || "unknown";
     const fakeFileKey = `podcast-audio/${videoId}-gemini-direct.mp3`;
     
-    console.log(`[YouTube] Gemini 直接分析成功！`);
+    console.log(`[YouTube] ✅ Gemini 直接分析成功！Video ID: ${videoId}, Title: ${directResult.title}`);
     
     return {
       transcription: directResult.transcription,

@@ -622,8 +622,25 @@ async function processPodcastTask(
         message: '正在使用 AI 分析 YouTube 影片內容...',
       });
       
-      console.log(`[Task ${taskId}] Calling processYoutubeToPodcast with URL: ${inputContent}`);
+      // 再次驗證 URL（確保使用正確的 URL）
+      const { extractVideoId } = await import('./youtubeService');
+      const finalVideoId = extractVideoId(inputContent);
+      if (!finalVideoId) {
+        throw new Error(`無法從 URL 中提取 Video ID: ${inputContent}`);
+      }
+      
+      console.log(`[Task ${taskId}] 🔍 Final verification - Processing URL: ${inputContent}`);
+      console.log(`[Task ${taskId}] 🔍 Video ID: ${finalVideoId}`);
+      console.log(`[Task ${taskId}] 🔍 Calling processYoutubeToPodcast...`);
+      
       result = await processYoutubeToPodcast(inputContent);
+      
+      // 驗證返回的結果是否包含正確的標題
+      if (result.title) {
+        console.log(`[Task ${taskId}] ✅ Processing completed. Title: ${result.title}`);
+      } else {
+        console.warn(`[Task ${taskId}] ⚠️  Processing completed but title is missing`);
+      }
       
       await updateProgress({
         taskId,
