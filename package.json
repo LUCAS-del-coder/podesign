@@ -17,7 +17,6 @@
     "@aws-sdk/client-s3": "^3.693.0",
     "@aws-sdk/s3-request-presigner": "^3.693.0",
     "@distube/ytdl-core": "^4.16.12",
-    "youtube-dl-exec": "^2.4.20",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
