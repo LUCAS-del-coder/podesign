@@ -642,7 +642,24 @@ export async function processYoutubeToPodcast(youtubeUrl: string): Promise<{
       title: directResult.title,
     };
   } catch (error) {
-    console.warn(`[YouTube] Gemini 直接分析失敗，回退到傳統方式:`, error);
+    // 這是正常的回退流程，不應該顯示為錯誤
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    
+    // 所有這些情況都是正常的回退，使用 info 級別而非 warn/error
+    if (errorMsg.includes("Gemini 直接分析不可用") || 
+        errorMsg.includes("所有模型都失敗") ||
+        errorMsg.includes("所有 Gemini 模型都無法使用") ||
+        errorMsg.includes("Rate limit") ||
+        errorMsg.includes("429") ||
+        errorMsg.includes("404") ||
+        errorMsg.includes("JSON") ||
+        errorMsg.includes("control character") ||
+        errorMsg.includes("quota")) {
+      console.log(`[YouTube] ℹ️  Gemini 直接分析不可用，使用傳統方式（下載+轉錄）`);
+    } else {
+      // 其他未知錯誤，記錄但不中斷
+      console.log(`[YouTube] ℹ️  使用傳統方式處理（下載+轉錄）`);
+    }
     
     // 回退到傳統方式：下載並轉錄
     console.log(`[YouTube] 使用傳統方式：下載並轉錄...`);
