@@ -1,31 +1,178 @@
 import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: mysql.Pool | null = null;
+let _reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY_MS = 5000; // 5 秒
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+/**
+ * 創建資料庫連接池
+ */
+function createConnectionPool(): mysql.Pool {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set!");
+  }
+
+  // 解析 DATABASE_URL (格式: mysql://user:password@host:port/database)
+  const url = new URL(process.env.DATABASE_URL);
+  
+  const pool = mysql.createPool({
+    host: url.hostname,
+    port: parseInt(url.port || "3306"),
+    user: url.username,
+    password: url.password,
+    database: url.pathname.slice(1), // 移除前導斜線
+    waitForConnections: true,
+    connectionLimit: 10, // 最大連接數
+    queueLimit: 0, // 無限制排隊
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
+    // 連接超時設定
+    connectTimeout: 10000, // 10 秒
+    // 自動重連設定
+    reconnect: true,
+  });
+
+  // 監聽連接錯誤
+  pool.on("connection", (connection) => {
+    console.log("[Database] New connection established");
+    _reconnectAttempts = 0; // 重置重連計數
+  });
+
+  pool.on("error", (error) => {
+    console.error("[Database] Pool error:", error);
+    
+    // 如果是連接錯誤，嘗試重連
+    if (error.code === "PROTOCOL_CONNECTION_LOST" || 
+        error.code === "ECONNREFUSED" ||
+        error.code === "ETIMEDOUT") {
+      handleReconnect();
+    }
+  });
+
+  return pool;
+}
+
+/**
+ * 處理資料庫重連
+ */
+async function handleReconnect(): Promise<void> {
+  if (_reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    console.error(`[Database] Max reconnect attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Giving up.`);
+    _db = null;
+    _pool = null;
+    return;
+  }
+
+  _reconnectAttempts++;
+  const delay = RECONNECT_DELAY_MS * _reconnectAttempts; // 指數退避
+  
+  console.log(`[Database] Attempting to reconnect (${_reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${delay}ms...`);
+  
+  // 關閉舊連接
+  if (_pool) {
+    try {
+      await _pool.end();
+    } catch (error) {
+      console.warn("[Database] Error closing old pool:", error);
+    }
+    _pool = null;
+    _db = null;
+  }
+
+  // 等待後重連
+  await new Promise(resolve => setTimeout(resolve, delay));
+  
+  try {
+    _pool = createConnectionPool();
+    _db = drizzle(_pool);
+    
+    // 測試連接
+    await _db.execute("SELECT 1");
+    console.log("[Database] Reconnection successful");
+    _reconnectAttempts = 0;
+  } catch (error) {
+    console.error("[Database] Reconnection failed:", error);
+    // 遞迴重試
+    await handleReconnect();
+  }
+}
+
+/**
+ * 獲取資料庫實例（帶連接池和重連機制）
+ */
 export async function getDb() {
   if (!process.env.DATABASE_URL) {
     console.error("[Database] DATABASE_URL environment variable is not set!");
     return null;
   }
 
-  if (!_db) {
+  // 如果連接池不存在或已關閉，創建新的
+  if (!_pool || !_db) {
     try {
-      console.log("[Database] Connecting to database...");
-      _db = drizzle(process.env.DATABASE_URL);
+      console.log("[Database] Creating connection pool...");
+      _pool = createConnectionPool();
+      _db = drizzle(_pool);
+      
       // 測試連接
       await _db.execute("SELECT 1");
-      console.log("[Database] Database connection successful");
+      console.log("[Database] Database connection pool created successfully");
+      _reconnectAttempts = 0;
     } catch (error) {
-      console.error("[Database] Failed to connect:", error);
-      console.error("[Database] DATABASE_URL format:", process.env.DATABASE_URL ? "Set (hidden)" : "Not set");
+      console.error("[Database] Failed to create connection pool:", error);
+      
+      // 嘗試重連
+      await handleReconnect();
+      
+      if (!_db) {
+        return null;
+      }
+    }
+  }
+
+  // 驗證連接是否仍然有效
+  try {
+    await _db.execute("SELECT 1");
+  } catch (error: any) {
+    // 連接已斷開，嘗試重連
+    if (error.code === "PROTOCOL_CONNECTION_LOST" || 
+        error.code === "ECONNREFUSED" ||
+        error.code === "ETIMEDOUT") {
+      console.warn("[Database] Connection lost, attempting to reconnect...");
+      await handleReconnect();
+      
+      if (!_db) {
+        return null;
+      }
+    } else {
+      throw error;
+    }
+  }
+
+  return _db;
+}
+
+/**
+ * 關閉資料庫連接池（用於優雅關閉）
+ */
+export async function closeDb(): Promise<void> {
+  if (_pool) {
+    console.log("[Database] Closing connection pool...");
+    try {
+      await _pool.end();
+      console.log("[Database] Connection pool closed");
+    } catch (error) {
+      console.error("[Database] Error closing connection pool:", error);
+    } finally {
+      _pool = null;
       _db = null;
     }
   }
-  return _db;
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {

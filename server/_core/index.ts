@@ -84,6 +84,31 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // 優雅關閉處理
+  const gracefulShutdown = async (signal: string) => {
+    console.log(`[Server] Received ${signal}, starting graceful shutdown...`);
+    
+    server.close(async () => {
+      console.log("[Server] HTTP server closed");
+      
+      // 關閉資料庫連接池
+      const { closeDb } = await import("../db");
+      await closeDb();
+      
+      console.log("[Server] Graceful shutdown completed");
+      process.exit(0);
+    });
+
+    // 強制關閉超時（10 秒）
+    setTimeout(() => {
+      console.error("[Server] Forced shutdown after timeout");
+      process.exit(1);
+    }, 10000);
+  };
+
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 }
 
 startServer().catch(console.error);
