@@ -33,8 +33,14 @@ function getStorageConfig(): StorageConfig {
   const apiKey = ENV.forgeApiKey;
 
   if (!baseUrl || !apiKey) {
+    const missingVars = [];
+    if (!baseUrl) missingVars.push('BUILT_IN_FORGE_API_URL');
+    if (!apiKey) missingVars.push('BUILT_IN_FORGE_API_KEY');
+    
     throw new Error(
-      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
+      `Storage proxy credentials missing: ${missingVars.join(', ')}. ` +
+      `Either configure AWS S3 (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, AWS_S3_BUCKET) ` +
+      `or Manus Forge API (BUILT_IN_FORGE_API_URL, BUILT_IN_FORGE_API_KEY)`
     );
   }
 
@@ -42,7 +48,9 @@ function getStorageConfig(): StorageConfig {
 }
 
 function buildUploadUrl(baseUrl: string, relKey: string): URL {
-  const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
+  // Manus Forge API endpoint format
+  const baseUrlWithSlash = ensureTrailingSlash(baseUrl);
+  const url = new URL("v1/storage/upload", baseUrlWithSlash);
   url.searchParams.set("path", normalizeKey(relKey));
   return url;
 }
@@ -100,6 +108,7 @@ export async function storagePut(
   // Use AWS S3 if configured, otherwise use Manus Forge API
   if (isS3Configured()) {
     try {
+      console.log(`[Storage] Using AWS S3: bucket=${ENV.awsS3Bucket}, region=${ENV.awsRegion}`);
       const s3Client = getS3Client();
       const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
       
@@ -117,29 +126,47 @@ export async function storagePut(
         ? `${ENV.awsS3PublicUrl}/${key}`
         : `https://${ENV.awsS3Bucket}.s3.${ENV.awsRegion}.amazonaws.com/${key}`;
       
+      console.log(`[Storage] AWS S3 upload successful: ${url}`);
       return { key, url };
     } catch (error) {
+      console.error(`[Storage] AWS S3 upload failed:`, error);
       throw new Error(`AWS S3 upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } else {
     // Fallback to Manus Forge API
-    const { baseUrl, apiKey } = getStorageConfig();
-    const uploadUrl = buildUploadUrl(baseUrl, key);
-    const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-    const response = await fetch(uploadUrl, {
-      method: "POST",
-      headers: buildAuthHeaders(apiKey),
-      body: formData,
-    });
+    try {
+      const { baseUrl, apiKey } = getStorageConfig();
+      console.log(`[Storage] Using Manus Forge API: baseUrl=${baseUrl}`);
+      const uploadUrl = buildUploadUrl(baseUrl, key);
+      console.log(`[Storage] Upload URL: ${uploadUrl.toString()}`);
+      
+      const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: buildAuthHeaders(apiKey),
+        body: formData,
+      });
 
-    if (!response.ok) {
-      const message = await response.text().catch(() => response.statusText);
-      throw new Error(
-        `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-      );
+      if (!response.ok) {
+        const message = await response.text().catch(() => response.statusText);
+        console.error(`[Storage] Manus Forge API upload failed: ${response.status} ${response.statusText}`);
+        console.error(`[Storage] Error message: ${message}`);
+        throw new Error(
+          `Manus Forge API upload failed (${response.status} ${response.statusText}): ${message}. ` +
+          `Please check BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY are correct.`
+        );
+      }
+      const result = await response.json();
+      const url = result.url;
+      console.log(`[Storage] Manus Forge API upload successful: ${url}`);
+      return { key, url };
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Storage proxy credentials missing')) {
+        throw error;
+      }
+      console.error(`[Storage] Upload failed:`, error);
+      throw error;
     }
-    const url = (await response.json()).url;
-    return { key, url };
   }
 }
 
