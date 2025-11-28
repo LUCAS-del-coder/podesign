@@ -196,16 +196,16 @@ export async function getPodcastEpisode(
 /**
  * 輪詢等待 Episode 完成（優化版本：更快的響應速度）
  * @param episodeId Episode ID
- * @param maxWaitTime 最長等待時間（毫秒），預設 20 分鐘
+ * @param maxWaitTime 最長等待時間（毫秒），預設 30 分鐘（增加超時時間）
  * @returns 完成的 Episode
  */
 export async function waitForPodcastCompletion(
   episodeId: string,
-  maxWaitTime: number = 20 * 60 * 1000 // 20 minutes
+  maxWaitTime: number = 30 * 60 * 1000 // 30 minutes (增加超時時間)
 ): Promise<PodcastEpisode> {
   const startTime = Date.now();
 
-  console.log(`[ListenHub] Waiting for episode ${episodeId} to complete...`);
+  console.log(`[ListenHub] Waiting for episode ${episodeId} to complete... (max wait: ${maxWaitTime / 1000 / 60} minutes)`);
 
   // 優化：減少初始等待時間（從 60 秒改為 30 秒）
   // 因為 ListenHub 通常在 30-60 秒內完成 quick 模式，deep 模式可能需要更長時間
@@ -214,44 +214,89 @@ export async function waitForPodcastCompletion(
   // 使用動態輪詢間隔：開始時頻繁查詢，之後逐漸延長
   let pollInterval = 5000; // 初始 5 秒
   let consecutivePendingCount = 0;
+  let lastStatus: string | undefined;
 
   while (Date.now() - startTime < maxWaitTime) {
-    const episode = await getPodcastEpisode(episodeId);
+    try {
+      const episode = await getPodcastEpisode(episodeId);
+      
+      // 記錄狀態變化
+      if (episode.processStatus !== lastStatus) {
+        console.log(`[ListenHub] Episode ${episodeId} status changed: ${lastStatus || 'unknown'} -> ${episode.processStatus}`);
+        lastStatus = episode.processStatus;
+      }
 
-    if (episode.processStatus === "success") {
-      console.log(`[ListenHub] Episode ${episodeId} completed successfully`);
-      return episode;
+      if (episode.processStatus === "success") {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        console.log(`[ListenHub] ✅ Episode ${episodeId} completed successfully in ${elapsed}s`);
+        return episode;
+      }
+
+      if (episode.processStatus === "failed") {
+        const errorMsg = episode.failCode 
+          ? `Episode generation failed with code: ${episode.failCode}`
+          : `Episode generation failed`;
+        console.error(`[ListenHub] ❌ ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      // 如果仍然是 pending，增加計數
+      consecutivePendingCount++;
+      
+      // 動態調整輪詢間隔：
+      // - 前 3 次：每 5 秒查詢（快速響應）
+      // - 4-10 次：每 10 秒查詢（正常速度）
+      // - 之後：每 15 秒查詢（節省 API 調用）
+      if (consecutivePendingCount <= 3) {
+        pollInterval = 5000; // 5 秒
+      } else if (consecutivePendingCount <= 10) {
+        pollInterval = 10000; // 10 秒
+      } else {
+        pollInterval = 15000; // 15 秒
+      }
+
+      const elapsed = Date.now() - startTime;
+      const elapsedSeconds = Math.floor(elapsed / 1000);
+      const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+      const remainingSeconds = elapsedSeconds % 60;
+      
+      // 每 5 分鐘輸出一次詳細狀態
+      if (elapsedSeconds % 300 === 0 || consecutivePendingCount === 1) {
+        console.log(`[ListenHub] Episode ${episodeId} still processing... (${elapsedMinutes}m ${remainingSeconds}s elapsed, status: ${episode.processStatus}, checking again in ${pollInterval/1000}s)`);
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    } catch (error) {
+      // 如果查詢失敗，記錄錯誤但繼續重試（可能是暫時的網路問題）
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      console.warn(`[ListenHub] ⚠️  Error checking episode ${episodeId} status (${elapsed}s elapsed):`, error instanceof Error ? error.message : String(error));
+      
+      // 如果錯誤持續超過 5 分鐘，可能 API 有問題
+      if (elapsed > 300) {
+        console.error(`[ListenHub] ❌ Persistent errors checking episode status, may indicate API issue`);
+      }
+      
+      // 等待後重試
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
     }
-
-    if (episode.processStatus === "failed") {
-      throw new Error(
-        `Episode generation failed with code: ${episode.failCode}`
-      );
-    }
-
-    // 如果仍然是 pending，增加計數
-    consecutivePendingCount++;
-    
-    // 動態調整輪詢間隔：
-    // - 前 3 次：每 5 秒查詢（快速響應）
-    // - 4-10 次：每 10 秒查詢（正常速度）
-    // - 之後：每 15 秒查詢（節省 API 調用）
-    if (consecutivePendingCount <= 3) {
-      pollInterval = 5000; // 5 秒
-    } else if (consecutivePendingCount <= 10) {
-      pollInterval = 10000; // 10 秒
-    } else {
-      pollInterval = 15000; // 15 秒
-    }
-
-    const elapsed = Date.now() - startTime;
-    const elapsedSeconds = Math.floor(elapsed / 1000);
-    console.log(`[ListenHub] Episode ${episodeId} still processing... (${elapsedSeconds}s elapsed, checking again in ${pollInterval/1000}s)`);
-
-    await new Promise((resolve) => setTimeout(resolve, pollInterval));
   }
 
-  throw new Error("Episode generation timeout");
+  // 超時前，最後一次檢查狀態
+  try {
+    const finalEpisode = await getPodcastEpisode(episodeId);
+    if (finalEpisode.processStatus === "success") {
+      console.log(`[ListenHub] ✅ Episode ${episodeId} completed on final check`);
+      return finalEpisode;
+    }
+    if (finalEpisode.processStatus === "failed") {
+      throw new Error(`Episode generation failed with code: ${finalEpisode.failCode}`);
+    }
+  } catch (error) {
+    console.error(`[ListenHub] ❌ Final check failed:`, error);
+  }
+
+  const elapsedMinutes = Math.floor((Date.now() - startTime) / 1000 / 60);
+  throw new Error(`Episode generation timeout after ${elapsedMinutes} minutes. Episode may still be processing on ListenHub side.`);
 }
 
 /**
