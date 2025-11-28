@@ -381,10 +381,8 @@ ${truncatedTranscription}`;
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      // 使用 json_object 格式（OpenAI 支援，更快）
-      response_format: {
-        type: "json_object",
-      },
+      // 注意：Gemini API 不支援 response_format，所以移除它
+      // 我們會在提示詞中明確要求 JSON 格式，並手動解析
     });
 
     const content = response.choices[0]?.message?.content;
@@ -395,17 +393,48 @@ ${truncatedTranscription}`;
     // content 可能是 string 或 array，需要處理
     const contentStr = typeof content === "string" ? content : JSON.stringify(content);
     
+    // 清理控制字符（類似 analyzeYoutubeUrlDirectly 中的處理）
+    const cleanJsonString = (text: string): string => {
+      // 移除控制字符（但保留換行符和空格，因為它們可能在 JSON 字符串值中）
+      return text
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // 移除壞的控制字符
+        .trim();
+    };
+    
     // 嘗試解析 JSON
     let result;
     try {
-      result = JSON.parse(contentStr);
+      const cleanedContent = cleanJsonString(contentStr);
+      result = JSON.parse(cleanedContent);
     } catch (parseError) {
       // 如果解析失敗，嘗試提取 JSON 部分
-      const jsonMatch = contentStr.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        result = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("無法解析 LLM 回應為 JSON");
+      try {
+        const cleanedContent = cleanJsonString(contentStr);
+        const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          result = JSON.parse(jsonMatch[0]);
+        } else {
+          // 記錄原始內容以便調試
+          console.error(`[AnalyzePodcast] Failed to extract JSON from response. Content preview: ${contentStr.substring(0, 500)}`);
+          throw new Error(`無法解析 LLM 回應為 JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        }
+      } catch (extractError) {
+        // 最後嘗試：手動提取關鍵欄位
+        console.warn(`[AnalyzePodcast] JSON parsing failed, trying manual extraction...`);
+        const summaryMatch = contentStr.match(/"summary"\s*:\s*"([^"]+)"/);
+        const scriptMatch = contentStr.match(/"podcastScript"\s*:\s*"([^"]+)"/);
+        
+        if (summaryMatch && scriptMatch) {
+          result = {
+            summary: summaryMatch[1],
+            podcastScript: scriptMatch[1],
+          };
+          console.log(`[AnalyzePodcast] Successfully extracted fields manually`);
+        } else {
+          // 記錄原始內容以便調試
+          console.error(`[AnalyzePodcast] Failed to parse JSON. Content preview: ${contentStr.substring(0, 1000)}`);
+          throw new Error(`無法解析 LLM 回應為 JSON: ${extractError instanceof Error ? extractError.message : String(extractError)}`);
+        }
       }
     }
     
