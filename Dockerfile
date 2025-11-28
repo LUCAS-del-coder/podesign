@@ -12,7 +12,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 安裝 yt-dlp（youtube-dl-exec 的依賴）
-RUN pip3 install --no-cache-dir yt-dlp
+# 使用 --break-system-packages 因為這是 Docker 容器，不會影響主機系統
+RUN pip3 install --no-cache-dir --break-system-packages yt-dlp
 
 # 驗證安裝
 RUN python3 --version && yt-dlp --version && ffmpeg -version | head -n 1
