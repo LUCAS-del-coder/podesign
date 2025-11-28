@@ -393,12 +393,18 @@ ${truncatedTranscription}`;
     // content 可能是 string 或 array，需要處理
     const contentStr = typeof content === "string" ? content : JSON.stringify(content);
     
-    // 清理控制字符（類似 analyzeYoutubeUrlDirectly 中的處理）
+    // 清理和提取 JSON 的輔助函數
     const cleanJsonString = (text: string): string => {
-      // 移除控制字符（但保留換行符和空格，因為它們可能在 JSON 字符串值中）
-      return text
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // 移除壞的控制字符
-        .trim();
+      // 1. 移除 markdown 代碼塊標記（```json ... ``` 或 ``` ... ```）
+      let cleaned = text.replace(/^```(?:json)?\s*\n?/gm, '').replace(/\n?```\s*$/gm, '');
+      
+      // 2. 移除控制字符（但保留換行符和空格，因為它們可能在 JSON 字符串值中）
+      cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+      
+      // 3. 移除前後空白
+      cleaned = cleaned.trim();
+      
+      return cleaned;
     };
     
     // 嘗試解析 JSON
@@ -410,6 +416,7 @@ ${truncatedTranscription}`;
       // 如果解析失敗，嘗試提取 JSON 部分
       try {
         const cleanedContent = cleanJsonString(contentStr);
+        // 嘗試匹配 JSON 對象（可能跨多行）
         const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           result = JSON.parse(jsonMatch[0]);
@@ -419,15 +426,25 @@ ${truncatedTranscription}`;
           throw new Error(`無法解析 LLM 回應為 JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
         }
       } catch (extractError) {
-        // 最後嘗試：手動提取關鍵欄位
+        // 最後嘗試：手動提取關鍵欄位（處理多行字符串值）
         console.warn(`[AnalyzePodcast] JSON parsing failed, trying manual extraction...`);
-        const summaryMatch = contentStr.match(/"summary"\s*:\s*"([^"]+)"/);
-        const scriptMatch = contentStr.match(/"podcastScript"\s*:\s*"([^"]+)"/);
+        
+        // 改進的正則表達式，處理多行字符串值
+        const summaryMatch = contentStr.match(/"summary"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
+        const scriptMatch = contentStr.match(/"podcastScript"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
         
         if (summaryMatch && scriptMatch) {
+          // 解碼轉義字符
+          const decodeString = (str: string) => {
+            return str
+              .replace(/\\n/g, '\n')
+              .replace(/\\"/g, '"')
+              .replace(/\\\\/g, '\\');
+          };
+          
           result = {
-            summary: summaryMatch[1],
-            podcastScript: scriptMatch[1],
+            summary: decodeString(summaryMatch[1]),
+            podcastScript: decodeString(scriptMatch[1]),
           };
           console.log(`[AnalyzePodcast] Successfully extracted fields manually`);
         } else {

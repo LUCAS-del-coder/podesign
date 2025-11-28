@@ -122,7 +122,15 @@ class SDKServer {
       throw ForbiddenError("User not found in database");
     }
 
-    console.log("[Auth] Authenticated user:", { id: user.id, openId: user.openId, name: user.name });
+    // 只在開發環境或首次認證時輸出日誌，避免輪詢時產生大量日誌
+    if (process.env.NODE_ENV !== 'production' || !global._authLogCount) {
+      global._authLogCount = 0;
+    }
+    global._authLogCount = (global._authLogCount || 0) + 1;
+    // 每 100 次認證才輸出一次日誌，減少日誌量
+    if (global._authLogCount % 100 === 0) {
+      console.log(`[Auth] Authenticated user (${global._authLogCount} requests):`, { id: user.id, openId: user.openId, name: user.name });
+    }
 
     await db.upsertUser({
       openId: user.openId,
