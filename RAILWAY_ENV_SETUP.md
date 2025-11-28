@@ -63,6 +63,27 @@ LISTENHUB_API_KEY=你的-listenhub-api-key
 - 前往 ListenHub 平台註冊並取得 API Key
 - 如果沒有，可以暫時留空（但 TTS 功能會無法使用）
 
+### 7. AWS S3 儲存（推薦）或 Manus Forge API（備用）
+
+**選項 A：AWS S3（推薦）**
+```
+AWS_ACCESS_KEY_ID=你的-aws-access-key-id
+AWS_SECRET_ACCESS_KEY=你的-aws-secret-access-key
+AWS_REGION=你的-aws-region（例如：us-east-1）
+AWS_S3_BUCKET=你的-bucket-名稱
+AWS_S3_PUBLIC_URL=https://your-cdn-domain.com（選用）
+```
+**如何取得：**
+- 詳細步驟請參考 [AWS_S3_SETUP.md](./AWS_S3_SETUP.md)
+- 需要建立 AWS 帳號、S3 Bucket 和 IAM 使用者
+
+**選項 B：Manus Forge API（備用，如果已有 Manus 帳號）**
+```
+BUILT_IN_FORGE_API_URL=https://api.manus.im
+BUILT_IN_FORGE_API_KEY=你的-manus-forge-api-key
+```
+**注意：** 系統會自動選擇：如果配置了 AWS S3，優先使用 S3；否則使用 Manus Forge API。
+
 ## 選用環境變數（可選）
 
 ### HeyGen API（影片生成功能）
@@ -98,6 +119,10 @@ VITE_ANALYTICS_WEBSITE_ID=your-website-id
 - [ ] `GOOGLE_REDIRECT_URI`
 - [ ] `OPENAI_API_KEY`
 - [ ] `LISTENHUB_API_KEY`
+- [ ] `AWS_ACCESS_KEY_ID`（或 `BUILT_IN_FORGE_API_URL`）
+- [ ] `AWS_SECRET_ACCESS_KEY`（或 `BUILT_IN_FORGE_API_KEY`）
+- [ ] `AWS_REGION`（如果使用 S3）
+- [ ] `AWS_S3_BUCKET`（如果使用 S3）
 
 ### 選用變數（視需求）
 - [ ] `HEYGEN_API_KEY`
