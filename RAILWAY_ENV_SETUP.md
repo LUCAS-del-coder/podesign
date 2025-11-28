@@ -63,9 +63,41 @@ LISTENHUB_API_KEY=你的-listenhub-api-key
 - 前往 ListenHub 平台註冊並取得 API Key
 - 如果沒有，可以暫時留空（但 TTS 功能會無法使用）
 
-### 7. AWS S3 儲存（推薦）或 Manus Forge API（備用）
+### 7. Storage 儲存服務（必須選擇一個）
 
-**選項 A：AWS S3（推薦）**
+系統支援多種 Storage 方案，會按以下順序自動選擇：
+1. **Cloudflare R2**（最推薦，完全免費）
+2. **Backblaze B2**（也很推薦，免費額度大）
+3. **AWS S3**（需要 AWS 帳號）
+4. **Manus Forge API**（目前無法使用）
+
+**選項 A：Cloudflare R2 ⭐ 最推薦（完全免費）**
+```
+CLOUDFLARE_ACCOUNT_ID=你的-account-id
+CLOUDFLARE_ACCESS_KEY_ID=你的-access-key-id
+CLOUDFLARE_SECRET_ACCESS_KEY=你的-secret-access-key
+CLOUDFLARE_R2_BUCKET=你的-bucket-名稱
+CLOUDFLARE_R2_PUBLIC_URL=https://your-custom-domain.com（選用）
+```
+**如何取得：**
+- 詳細步驟請參考 [STORAGE_ALTERNATIVES.md](./STORAGE_ALTERNATIVES.md)
+- 免費：10GB 儲存 + 每月 100 萬次讀取
+- 設定時間：約 5-10 分鐘
+
+**選項 B：Backblaze B2 ⭐ 也很推薦（免費額度大）**
+```
+BACKBLAZE_KEY_ID=你的-key-id
+BACKBLAZE_APPLICATION_KEY=你的-application-key
+BACKBLAZE_BUCKET_NAME=你的-bucket-名稱
+BACKBLAZE_REGION=us-west-004（或您的 bucket 區域）
+BACKBLAZE_PUBLIC_URL=https://your-custom-domain.com（選用）
+```
+**如何取得：**
+- 詳細步驟請參考 [STORAGE_ALTERNATIVES.md](./STORAGE_ALTERNATIVES.md)
+- 免費：10GB 儲存 + 每天 1GB 下載
+- 設定時間：約 10 分鐘
+
+**選項 C：AWS S3（需要 AWS 帳號）**
 ```
 AWS_ACCESS_KEY_ID=你的-aws-access-key-id
 AWS_SECRET_ACCESS_KEY=你的-aws-secret-access-key
@@ -77,18 +109,12 @@ AWS_S3_PUBLIC_URL=https://your-cdn-domain.com（選用）
 - 詳細步驟請參考 [AWS_S3_SETUP.md](./AWS_S3_SETUP.md)
 - 需要建立 AWS 帳號、S3 Bucket 和 IAM 使用者
 
-**選項 B：Manus Forge API（備用，如果已有 Manus 帳號）**
+**選項 D：Manus Forge API（目前無法使用）**
 ```
 BUILT_IN_FORGE_API_URL=https://api.manus.im
 BUILT_IN_FORGE_API_KEY=你的-manus-forge-api-key
 ```
-**如何取得：**
-- 詳細步驟請參考 [MANUS_FORGE_SETUP.md](./MANUS_FORGE_SETUP.md)
-- 需要 Manus 帳號並取得 Forge API Key
-
-**注意：** 
-- 系統會自動選擇：如果配置了 AWS S3，優先使用 S3；否則使用 Manus Forge API
-- 如果只想使用 Manus Forge API，請**不要設定** AWS S3 相關環境變數
+**注意：** 目前 Manus Forge API 的 Storage 功能無法使用（404 錯誤），不建議使用此選項。
 
 ## 選用環境變數（可選）
 
@@ -125,10 +151,10 @@ VITE_ANALYTICS_WEBSITE_ID=your-website-id
 - [ ] `GOOGLE_REDIRECT_URI`
 - [ ] `OPENAI_API_KEY`
 - [ ] `LISTENHUB_API_KEY`
-- [ ] `AWS_ACCESS_KEY_ID`（或 `BUILT_IN_FORGE_API_URL`）
-- [ ] `AWS_SECRET_ACCESS_KEY`（或 `BUILT_IN_FORGE_API_KEY`）
-- [ ] `AWS_REGION`（如果使用 S3）
-- [ ] `AWS_S3_BUCKET`（如果使用 S3）
+- [ ] **Storage 服務**（選擇一個）：
+  - [ ] Cloudflare R2：`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ACCESS_KEY_ID`, `CLOUDFLARE_SECRET_ACCESS_KEY`, `CLOUDFLARE_R2_BUCKET` ⭐ 推薦
+  - [ ] Backblaze B2：`BACKBLAZE_KEY_ID`, `BACKBLAZE_APPLICATION_KEY`, `BACKBLAZE_BUCKET_NAME`, `BACKBLAZE_REGION` ⭐ 推薦
+  - [ ] AWS S3：`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET`
 
 ### 選用變數（視需求）
 - [ ] `HEYGEN_API_KEY`
