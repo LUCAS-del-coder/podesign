@@ -425,27 +425,5 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     throw new Error(`LLM invoke failed: All models failed. Last error: ${lastError?.message}. Please check GOOGLE_GEMINI_API_KEY is correctly set in Railway.`);
   }
   
-  const geminiResponse = { model: usedModel, candidates: result.choices };
-  
-  // Convert Gemini response to our format
-  const result: InvokeResult = {
-    id: `gemini-${Date.now()}`,
-    created: Math.floor(Date.now() / 1000),
-    model: geminiResponse.model || usedModel || "gemini-1.5-flash",
-    choices: geminiResponse.candidates?.map((candidate: any, index: number) => ({
-      index,
-      message: {
-        role: "assistant" as Role,
-        content: candidate.content?.parts?.[0]?.text || "",
-      },
-      finish_reason: candidate.finishReason || null,
-    })) || [],
-    usage: geminiResponse.usageMetadata ? {
-      prompt_tokens: geminiResponse.usageMetadata.promptTokenCount || 0,
-      completion_tokens: geminiResponse.usageMetadata.candidatesTokenCount || 0,
-      total_tokens: geminiResponse.usageMetadata.totalTokenCount || 0,
-    } : undefined,
-  };
-
   return result;
 }
