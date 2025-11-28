@@ -428,6 +428,14 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
 }> {
   console.log(`[YouTube] 使用 Gemini 直接分析 YouTube URL: ${youtubeUrl}`);
   
+  // 使用 Gemini API 直接分析 YouTube URL
+  // 注意：需要使用特殊的格式來傳遞 YouTube URL
+  const { ENV } = await import("./_core/env");
+  
+  if (!ENV.googleGeminiApiKey) {
+    throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+  }
+
   const systemPrompt = `你是專業的 Podcast 編輯。分析 YouTube 影片並生成繁體中文 Podcast 內容。
 
 輸出 JSON 格式：
@@ -438,44 +446,63 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
   "podcastScript": "第三人稱 Podcast 腳本（含 intro、主要內容、outro）"
 }`;
 
-  const userPrompt = `請分析這個 YouTube 影片並生成繁體中文 Podcast 內容：
-
-${youtubeUrl}
-
-請直接觀看影片內容（如果可能），或根據影片標題和描述生成內容。`;
-
-  const response = await invokeLLM({
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    response_format: {
-      type: "json_object",
+  // 使用 Gemini API 直接分析 YouTube URL
+  // 根據 Gemini 文件，可以使用 file_data 格式傳遞 YouTube URL
+  const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${ENV.googleGeminiApiKey}`;
+  
+  const payload = {
+    contents: [{
+      parts: [
+        { text: systemPrompt },
+        { 
+          text: `請分析這個 YouTube 影片並生成繁體中文 Podcast 內容。影片網址：${youtubeUrl}\n\n請直接觀看影片內容並生成 JSON 格式的回應。`
+        }
+      ]
+    }],
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
     },
+  };
+
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
   });
 
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    throw new Error("LLM 未返回內容");
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API failed: ${response.status} ${response.statusText} – ${errorText}`);
   }
 
-  const contentStr = typeof content === "string" ? content : JSON.stringify(content);
-  
+  const geminiResponse = await response.json();
+  const content = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+
+  if (!content) {
+    throw new Error("Gemini 未返回內容");
+  }
+
+  // 解析 JSON 回應
   let result;
   try {
-    result = JSON.parse(contentStr);
+    result = JSON.parse(content);
   } catch (parseError) {
-    const jsonMatch = contentStr.match(/\{[\s\S]*\}/);
+    // 如果解析失敗，嘗試提取 JSON 部分
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       result = JSON.parse(jsonMatch[0]);
     } else {
-      throw new Error("無法解析 LLM 回應為 JSON");
+      throw new Error("無法解析 Gemini 回應為 JSON");
     }
   }
 
   // 驗證結果格式
   if (!result.summary || !result.podcastScript) {
-    throw new Error("LLM 回應格式不正確，缺少必要欄位");
+    throw new Error("Gemini 回應格式不正確，缺少必要欄位");
   }
 
   return {
