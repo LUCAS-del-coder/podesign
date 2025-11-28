@@ -2,8 +2,8 @@ export const ENV = {
   cookieSecret: process.env.JWT_SECRET ?? "",
   databaseUrl: process.env.DATABASE_URL ?? "",
   isProduction: process.env.NODE_ENV === "production",
-  // OpenAI API key for Whisper transcription
-  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  // AssemblyAI API key for speech-to-text transcription
+  assemblyaiApiKey: process.env.ASSEMBLYAI_API_KEY ?? "",
   // Storage configuration - AWS S3
   awsAccessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
   awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",

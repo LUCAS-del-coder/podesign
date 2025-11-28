@@ -44,16 +44,18 @@ GOOGLE_REDIRECT_URI=https://你的網域/api/oauth/callback
 
 **注意：** 如果是本地開發，可以使用 `http://localhost:3000/api/oauth/callback`
 
-### 4. OpenAI API（語音轉錄）
+### 4. AssemblyAI API（語音轉錄）
 ```
-OPENAI_API_KEY=你的-openai-api-key
+ASSEMBLYAI_API_KEY=你的-assemblyai-api-key
 ```
 **如何取得：**
-1. 前往 [OpenAI Platform](https://platform.openai.com/)
-2. 登入或註冊帳號
-3. 前往 **API Keys** 頁面
-4. 建立新的 API Key
-5. 複製並妥善保存（只會顯示一次）
+1. 前往 [AssemblyAI](https://www.assemblyai.com/)
+2. 註冊或登入帳號
+3. 前往 **API Keys** 頁面（在 Dashboard 中）
+4. 複製您的 API Key
+5. 免費額度：每月 5 小時轉錄時間
+
+**注意：** AssemblyAI 提供更穩定的連線，適合 Railway 部署環境。
 
 ### 6. ListenHub TTS API
 ```

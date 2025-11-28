@@ -1,5 +1,5 @@
 /**
- * Voice transcription helper using OpenAI Whisper API
+ * Voice transcription helper using AssemblyAI API
  *
  * Frontend implementation guide:
  * 1. Capture audio using MediaRecorder API
@@ -25,7 +25,7 @@
  * });
  * ```
  */
-import OpenAI from "openai";
+import { AssemblyAI } from 'assemblyai';
 
 export type TranscribeOptions = {
   audioUrl: string; // URL to the audio file (e.g., S3 URL)
@@ -33,7 +33,7 @@ export type TranscribeOptions = {
   prompt?: string; // Optional: custom prompt for the transcription
 };
 
-// Native Whisper API segment format
+// AssemblyAI segment format (compatible with Whisper format)
 export type WhisperSegment = {
   id: number;
   seek: number;
@@ -47,7 +47,7 @@ export type WhisperSegment = {
   no_speech_prob: number;
 };
 
-// Native Whisper API response format
+// Response format (compatible with Whisper format)
 export type WhisperResponse = {
   task: "transcribe";
   language: string;
@@ -56,7 +56,7 @@ export type WhisperResponse = {
   segments: WhisperSegment[];
 };
 
-export type TranscriptionResponse = WhisperResponse; // Return native Whisper API response directly
+export type TranscriptionResponse = WhisperResponse;
 
 export type TranscriptionError = {
   error: string;
@@ -65,286 +65,207 @@ export type TranscriptionError = {
 };
 
 /**
- * Transcribe audio to text using the internal Speech-to-Text service
+ * Initialize AssemblyAI client
+ */
+const getAssemblyAIClient = (): AssemblyAI => {
+  const apiKey = process.env.ASSEMBLYAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("ASSEMBLYAI_API_KEY is not set");
+  }
+  return new AssemblyAI({
+    apiKey,
+  });
+};
+
+/**
+ * Map language code to AssemblyAI language code
+ */
+function mapLanguageCode(lang?: string): string | undefined {
+  if (!lang) return undefined;
+  
+  // AssemblyAI uses different language codes than OpenAI
+  const langMap: Record<string, string> = {
+    'zh': 'zh', // Chinese
+    'en': 'en', // English
+    'es': 'es', // Spanish
+    'fr': 'fr', // French
+    'de': 'de', // German
+    'it': 'it', // Italian
+    'pt': 'pt', // Portuguese
+    'ru': 'ru', // Russian
+    'ja': 'ja', // Japanese
+    'ko': 'ko', // Korean
+  };
+  
+  return langMap[lang.toLowerCase()] || lang;
+}
+
+/**
+ * Transcribe audio to text using AssemblyAI
  * 
  * @param options - Audio data and metadata
  * @returns Transcription result or error
  */
-// Custom fetch implementation with better error handling for Railway
-const customFetch = async (url: string, options?: RequestInit): Promise<Response> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
-  
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-      // Add keep-alive headers for better connection stability
-      headers: {
-        ...options?.headers,
-        'Connection': 'keep-alive',
-        'Keep-Alive': 'timeout=300',
-      },
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
-};
-
-// Initialize OpenAI client with timeout and retry configuration
-const getOpenAIClient = (): OpenAI => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not set");
-  }
-  return new OpenAI({ 
-    apiKey,
-    timeout: 300000, // 5 minutes timeout for large audio files
-    maxRetries: 0, // Disable SDK retries, we handle retries manually
-    fetch: customFetch, // Use custom fetch with better error handling
-  });
-};
-
 export async function transcribeAudio(
   options: TranscribeOptions
 ): Promise<TranscriptionResponse | TranscriptionError> {
   try {
     // Step 1: Validate environment configuration
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.ASSEMBLYAI_API_KEY) {
       return {
-        error: "OpenAI API key is not configured",
+        error: "AssemblyAI API key is not configured",
         code: "SERVICE_ERROR",
-        details: "OPENAI_API_KEY environment variable is not set"
+        details: "ASSEMBLYAI_API_KEY environment variable is not set"
       };
     }
 
-    // Step 2: Download audio from URL to server
-    // We download to server first because OpenAI may not be able to access signed URLs
-    let audioBuffer: Buffer;
-    let mimeType: string;
-    try {
-      console.log(`[Whisper] Fetching audio from URL: ${options.audioUrl.substring(0, 100)}...`);
-      const response = await fetch(options.audioUrl, {
-        // Add timeout and headers
-        signal: AbortSignal.timeout(120000), // 120 second timeout for large files
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PodcastMaker/1.0)',
-        },
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => response.statusText);
-        console.error(`[Whisper] Failed to download audio: HTTP ${response.status} ${response.statusText}`);
-        console.error(`[Whisper] Error details: ${errorText.substring(0, 500)}`);
-        return {
-          error: "Failed to download audio file",
-          code: "INVALID_FORMAT",
-          details: `HTTP ${response.status}: ${response.statusText}. URL: ${options.audioUrl.substring(0, 100)}...`
-        };
-      }
-      
-      console.log(`[Whisper] Audio download successful, content-type: ${response.headers.get('content-type')}`);
-      audioBuffer = Buffer.from(await response.arrayBuffer());
-      mimeType = response.headers.get('content-type') || 'audio/mpeg';
-      
-      console.log(`[Whisper] Audio buffer size: ${(audioBuffer.length / (1024 * 1024)).toFixed(2)}MB`);
-      
-      // Check file size (25MB limit for OpenAI Whisper)
-      const sizeMB = audioBuffer.length / (1024 * 1024);
-      if (sizeMB > 25) {
-        return {
-          error: "Audio file exceeds maximum size limit",
-          code: "FILE_TOO_LARGE",
-          details: `File size is ${sizeMB.toFixed(2)}MB, maximum allowed is 25MB`
-        };
-      }
-    } catch (error) {
-      console.error(`[Whisper] Error fetching audio file:`, error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      return {
-        error: "Failed to fetch audio file",
-        code: "SERVICE_ERROR",
-        details: `${errorMessage}. URL: ${options.audioUrl.substring(0, 100)}...`
-      };
-    }
-
-    // Step 3: Create File object for OpenAI API
-    // Use Blob instead of File for better Node.js compatibility
-    const filename = `audio.${getFileExtension(mimeType)}`;
-    const audioBlob = new Blob([audioBuffer], { type: mimeType });
-    const audioFile = new File([audioBlob], filename, { type: mimeType });
-
-    // Step 4: Call OpenAI Whisper API with retry logic
-    console.log(`[Whisper] Calling OpenAI Whisper API with file upload (${(audioBuffer.length / (1024 * 1024)).toFixed(2)}MB)...`);
-    const openai = getOpenAIClient();
-    let transcription;
+    console.log(`[AssemblyAI] Starting transcription for URL: ${options.audioUrl.substring(0, 100)}...`);
     
-    // Retry configuration
-    const maxRetries = 5; // Increase to 5 retries for network issues
-    let lastError: any = null;
+    // Step 2: Initialize AssemblyAI client
+    const client = getAssemblyAIClient();
     
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[Whisper] Attempt ${attempt}/${maxRetries} (uploading file directly)...`);
-        
-        // Create a fresh File object for each attempt
-        const fileForUpload = new File([audioBlob], filename, { type: mimeType });
-        
-        transcription = await openai.audio.transcriptions.create({
-          file: fileForUpload,
-          model: "whisper-1",
-          response_format: "verbose_json",
-          language: options.language || undefined,
-          prompt: options.prompt || undefined,
-        }, {
-          timeout: 300000, // 5 minutes timeout per request
-        });
-        
-        console.log(`[Whisper] Transcription successful, language: ${transcription.language}, duration: ${transcription.duration}s`);
-        break; // Success, exit retry loop
-      } catch (apiError: any) {
-        lastError = apiError;
-        const errorMsg = apiError?.message || apiError?.toString() || 'Unknown error';
-        const errorCode = apiError?.code || apiError?.type || 'unknown';
-        console.error(`[Whisper] Attempt ${attempt} failed:`, {
-          message: errorMsg,
-          code: errorCode,
-          cause: apiError?.cause?.message,
-        });
-        
-        // Check if it's a retryable error
-        const isRetryable = 
-          errorCode === 'ECONNRESET' ||
-          errorCode === 'ETIMEDOUT' ||
-          errorCode === 'ENOTFOUND' ||
-          errorCode === 'ECONNREFUSED' ||
-          errorMsg.includes('Connection error') ||
-          errorMsg.includes('timeout') ||
-          errorMsg.includes('ECONNRESET') ||
-          errorMsg.includes('ETIMEDOUT') ||
-          apiError?.type === 'system' ||
-          (apiError?.cause && (
-            apiError.cause.code === 'ECONNRESET' ||
-            apiError.cause.code === 'ETIMEDOUT'
-          ));
-        
-        // Don't retry on authentication or rate limit errors
-        if (errorMsg.includes("API key") || 
-            errorMsg.includes("authentication") ||
-            errorMsg.includes("rate limit") ||
-            errorMsg.includes("401") ||
-            errorMsg.includes("429")) {
-          console.error(`[Whisper] Non-retryable error detected, stopping retries`);
-          break; // Exit retry loop for non-retryable errors
-        }
-        
-        // If this is the last attempt or not retryable, break
-        if (attempt === maxRetries || !isRetryable) {
-          console.error(`[Whisper] ${attempt === maxRetries ? 'Max retries reached' : 'Non-retryable error'}, stopping`);
-          break;
-        }
-        
-        // Wait before retrying (exponential backoff with jitter)
-        const baseWaitTime = 2000; // Start with 2 seconds
-        const waitTime = Math.min(baseWaitTime * Math.pow(2, attempt - 1) + Math.random() * 1000, 15000); // Max 15 seconds
-        console.log(`[Whisper] Retrying in ${Math.round(waitTime)}ms...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
+    // Step 3: Submit transcription job
+    // AssemblyAI can directly accept URLs, so we don't need to download the file
+    const transcriptParams: any = {
+      audio: options.audioUrl,
+      language_code: mapLanguageCode(options.language) || undefined,
+    };
+    
+    // Add prompt if provided (AssemblyAI uses "prompt" parameter)
+    if (options.prompt) {
+      transcriptParams.prompt = options.prompt;
     }
     
-    // If transcription is still undefined, handle the error
-    if (!transcription) {
-      console.error(`[Whisper] All ${maxRetries} attempts failed`);
-      if (lastError instanceof Error) {
-        if (lastError.message.includes("API key") || lastError.message.includes("authentication")) {
-          return {
-            error: "OpenAI API authentication failed",
-            code: "SERVICE_ERROR",
-            details: `Please check OPENAI_API_KEY: ${lastError.message}`
-          };
-        }
-        if (lastError.message.includes("rate limit")) {
-          return {
-            error: "OpenAI API rate limit exceeded",
-            code: "SERVICE_ERROR",
-            details: "Please try again later"
-          };
-        }
-        // Check for connection errors
-        if (lastError.code === 'ECONNRESET' || 
-            lastError.message?.includes('Connection error') ||
-            lastError.type === 'system') {
-          return {
-            error: "OpenAI API connection failed",
-            code: "SERVICE_ERROR",
-            details: `Network error after ${maxRetries} attempts. Please check your internet connection and try again. Error: ${lastError.message}`
-          };
-        }
+    console.log(`[AssemblyAI] Submitting transcription job...`);
+    const transcript = await client.transcripts.transcribe(transcriptParams);
+    
+    // Step 4: Poll for completion (AssemblyAI handles this internally, but we can check status)
+    console.log(`[AssemblyAI] Transcription job submitted, ID: ${transcript.id}`);
+    console.log(`[AssemblyAI] Status: ${transcript.status}`);
+    
+    // Wait for transcription to complete
+    // The SDK should handle polling, but we'll wait for the result
+    let finalTranscript = transcript;
+    const maxWaitTime = 600000; // 10 minutes
+    const startTime = Date.now();
+    const pollInterval = 3000; // Poll every 3 seconds
+    
+    while (finalTranscript.status === 'queued' || finalTranscript.status === 'processing') {
+      if (Date.now() - startTime > maxWaitTime) {
         return {
-          error: "OpenAI API call failed",
+          error: "Transcription timeout",
           code: "SERVICE_ERROR",
-          details: lastError.message
+          details: "Transcription took too long to complete"
         };
       }
+      
+      console.log(`[AssemblyAI] Polling... Status: ${finalTranscript.status}`);
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+      // Get updated transcript
+      finalTranscript = await client.transcripts.get(finalTranscript.id);
+    }
+    
+    // Step 5: Check for errors
+    if (finalTranscript.status === 'error') {
+      const errorMsg = finalTranscript.error || 'Unknown error';
+      console.error(`[AssemblyAI] Transcription failed: ${errorMsg}`);
       return {
-        error: "OpenAI API call failed",
-        code: "SERVICE_ERROR",
-        details: "Unknown error occurred after multiple retries"
+        error: "Transcription failed",
+        code: "TRANSCRIPTION_FAILED",
+        details: errorMsg
       };
     }
-
-    // Step 5: Convert OpenAI response to our format
-    const whisperResponse: WhisperResponse = {
-      task: "transcribe",
-      language: transcription.language || "unknown",
-      duration: transcription.duration || 0,
-      text: transcription.text,
-      segments: transcription.segments?.map((seg, idx) => ({
+    
+    if (!finalTranscript.text) {
+      return {
+        error: "Invalid transcription response",
+        code: "SERVICE_ERROR",
+        details: "Transcription service returned an empty response"
+      };
+    }
+    
+    console.log(`[AssemblyAI] Transcription successful! Language: ${finalTranscript.language_code}, Duration: ${finalTranscript.audio_duration ? Math.round(finalTranscript.audio_duration / 1000) : 0}s`);
+    
+    // Step 6: Convert AssemblyAI response to our format
+    const segments: WhisperSegment[] = (finalTranscript.words || []).map((word: any, idx: number) => ({
+      id: idx,
+      seek: word.start / 1000, // Convert ms to seconds
+      start: word.start / 1000,
+      end: word.end / 1000,
+      text: word.text || '',
+      tokens: [],
+      temperature: 0,
+      avg_logprob: 0,
+      compression_ratio: 0,
+      no_speech_prob: 0,
+    }));
+    
+    // If we have utterances, use them for better segmentation
+    if (finalTranscript.utterances && finalTranscript.utterances.length > 0) {
+      const utteranceSegments: WhisperSegment[] = finalTranscript.utterances.map((utterance: any, idx: number) => ({
         id: idx,
-        seek: seg.start || 0,
-        start: seg.start || 0,
-        end: seg.end || 0,
-        text: seg.text || "",
+        seek: utterance.start / 1000,
+        start: utterance.start / 1000,
+        end: utterance.end / 1000,
+        text: utterance.text || '',
         tokens: [],
         temperature: 0,
         avg_logprob: 0,
         compression_ratio: 0,
         no_speech_prob: 0,
-      })) || [],
-    };
-
-    // Validate response structure
-    if (!whisperResponse.text || typeof whisperResponse.text !== 'string') {
-      return {
-        error: "Invalid transcription response",
-        code: "SERVICE_ERROR",
-        details: "Transcription service returned an invalid response format"
+      }));
+      
+      // Use utterances if available (better segmentation)
+      const whisperResponse: WhisperResponse = {
+        task: "transcribe",
+        language: finalTranscript.language_code || "unknown",
+        duration: finalTranscript.audio_duration ? Math.round(finalTranscript.audio_duration / 1000) : 0,
+        text: finalTranscript.text,
+        segments: utteranceSegments,
       };
+      
+      return whisperResponse;
     }
-
+    
+    const whisperResponse: WhisperResponse = {
+      task: "transcribe",
+      language: finalTranscript.language_code || "unknown",
+      duration: finalTranscript.audio_duration ? Math.round(finalTranscript.audio_duration / 1000) : 0,
+      text: finalTranscript.text,
+      segments: segments,
+    };
+    
     return whisperResponse;
 
   } catch (error) {
     // Handle unexpected errors
+    console.error(`[AssemblyAI] Error:`, error);
+    
     if (error instanceof Error) {
-      if (error.message.includes("API key")) {
+      if (error.message.includes("API key") || error.message.includes("authentication")) {
         return {
-          error: "OpenAI API authentication failed",
+          error: "AssemblyAI API authentication failed",
           code: "SERVICE_ERROR",
-          details: error.message
+          details: `Please check ASSEMBLYAI_API_KEY: ${error.message}`
         };
       }
       if (error.message.includes("rate limit")) {
         return {
-          error: "OpenAI API rate limit exceeded",
+          error: "AssemblyAI API rate limit exceeded",
           code: "SERVICE_ERROR",
           details: "Please try again later"
         };
       }
+      if (error.message.includes("file size") || error.message.includes("too large")) {
+        return {
+          error: "Audio file exceeds maximum size limit",
+          code: "FILE_TOO_LARGE",
+          details: error.message
+        };
+      }
     }
+    
     return {
       error: "Voice transcription failed",
       code: "SERVICE_ERROR",
@@ -399,45 +320,3 @@ function getLanguageName(langCode: string): string {
   
   return langMap[langCode] || langCode;
 }
-
-/**
- * Example tRPC procedure implementation:
- * 
- * ```ts
- * // In server/routers.ts
- * import { transcribeAudio } from "./_core/voiceTranscription";
- * 
- * export const voiceRouter = router({
- *   transcribe: protectedProcedure
- *     .input(z.object({
- *       audioUrl: z.string(),
- *       language: z.string().optional(),
- *       prompt: z.string().optional(),
- *     }))
- *     .mutation(async ({ input, ctx }) => {
- *       const result = await transcribeAudio(input);
- *       
- *       // Check if it's an error
- *       if ('error' in result) {
- *         throw new TRPCError({
- *           code: 'BAD_REQUEST',
- *           message: result.error,
- *           cause: result,
- *         });
- *       }
- *       
- *       // Optionally save transcription to database
- *       await db.insert(transcriptions).values({
- *         userId: ctx.user.id,
- *         text: result.text,
- *         duration: result.duration,
- *         language: result.language,
- *         audioUrl: input.audioUrl,
- *         createdAt: new Date(),
- *       });
- *       
- *       return result;
- *     }),
- * });
- * ```
- */
