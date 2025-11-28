@@ -55,27 +55,47 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
   try {
     console.log(`[YouTube] 開始下載音訊: ${youtubeUrl}`);
 
-    // 獲取影片資訊
+    // 獲取影片資訊 - 添加重試機制
     let videoInfo;
-    try {
-      videoInfo = await ytdl.getInfo(youtubeUrl);
-      console.log(`[YouTube] 影片標題: ${videoInfo.videoDetails.title}`);
-      console.log(`[YouTube] 影片長度: ${videoInfo.videoDetails.lengthSeconds} 秒`);
-    } catch (error: any) {
-      console.error(`[YouTube] 獲取影片資訊失敗:`, error);
-      
-      // 提供友善的錯誤訊息
-      let errorMessage = '無法獲取 YouTube 影片資訊';
-      if (error.message?.includes('private')) {
-        errorMessage = '此影片為私人影片，無法下載';
-      } else if (error.message?.includes('unavailable')) {
-        errorMessage = '影片不存在或不可用';
-      } else if (error.message?.includes('age')) {
-        errorMessage = '此影片有年齡限制，無法下載';
-      } else if (error.message?.includes('region')) {
-        errorMessage = '影片在您的國家/地區不可用';
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (retryCount < maxRetries) {
+      try {
+        videoInfo = await ytdl.getInfo(youtubeUrl, {
+          requestOptions: {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            },
+          },
+        });
+        console.log(`[YouTube] 影片標題: ${videoInfo.videoDetails.title}`);
+        console.log(`[YouTube] 影片長度: ${videoInfo.videoDetails.lengthSeconds} 秒`);
+        break; // 成功，跳出重試循環
+      } catch (error: any) {
+        retryCount++;
+        console.error(`[YouTube] 獲取影片資訊失敗 (嘗試 ${retryCount}/${maxRetries}):`, error.message);
+        
+        if (retryCount >= maxRetries) {
+          // 提供友善的錯誤訊息
+          let errorMessage = '無法獲取 YouTube 影片資訊';
+          if (error.message?.includes('private')) {
+            errorMessage = '此影片為私人影片，無法下載';
+          } else if (error.message?.includes('unavailable')) {
+            errorMessage = '影片不存在或不可用';
+          } else if (error.message?.includes('age')) {
+            errorMessage = '此影片有年齡限制，無法下載';
+          } else if (error.message?.includes('region')) {
+            errorMessage = '影片在您的國家/地區不可用';
+          } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+            errorMessage = 'YouTube 暫時限制存取，請稍後重試';
+          }
+          throw new Error(errorMessage);
+        }
+        
+        // 等待後重試
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
       }
-      throw new Error(errorMessage);
     }
 
     // 選擇最佳音訊格式（優先選擇 opus 或 mp4）
@@ -93,25 +113,52 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
 
     console.log(`[YouTube] 使用音訊格式: ${format.mimeType}, 位元率: ${format.bitrate}`);
 
-    // 下載音訊
-    const audioStream = ytdl(youtubeUrl, {
-      quality: format.itag,
-      filter: 'audioonly',
-    });
+    // 下載音訊 - 使用更寬鬆的選項以提高成功率
+    let audioStream;
+    try {
+      audioStream = ytdl(youtubeUrl, {
+        quality: 'lowestaudio', // 使用最低品質以提高成功率
+        filter: 'audioonly',
+        requestOptions: {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error(`[YouTube] 建立下載串流失敗:`, error);
+      throw new Error('無法建立下載連線，請稍後重試');
+    }
 
     const writeStream = createWriteStream(outputPath);
     
     // 使用 pipeline 處理串流，並處理錯誤
     try {
-      await pipeline(audioStream, writeStream);
+      // 設定超時（10 分鐘）
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('下載超時')), 10 * 60 * 1000);
+      });
+
+      await Promise.race([
+        pipeline(audioStream, writeStream),
+        timeoutPromise,
+      ]);
     } catch (error: any) {
       console.error(`[YouTube] 下載失敗:`, error);
       let errorMessage = 'YouTube 影片下載失敗';
-      if (error.message?.includes('timeout')) {
+      
+      if (error.message?.includes('timeout') || error.message === '下載超時') {
         errorMessage = '下載超時。影片可能過長或網路連線不穩定，請稍後重試';
-      } else if (error.message?.includes('403')) {
+      } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
         errorMessage = '無法下載影片。YouTube 可能已更新其保護機制，請稍後重試';
+      } else if (error.message?.includes('Sign in to confirm your age')) {
+        errorMessage = '此影片有年齡限制，無法下載';
+      } else if (error.message?.includes('Video unavailable')) {
+        errorMessage = '影片不存在或不可用';
+      } else if (error.message?.includes('Private video')) {
+        errorMessage = '此影片為私人影片，無法下載';
       }
+      
       throw new Error(errorMessage);
     }
 
