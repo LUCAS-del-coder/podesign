@@ -117,10 +117,14 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
       
       try {
         // 使用 yt-dlp 的格式選項下載最佳音訊
+        // 明確指定音訊格式，並使用 ffmpeg 轉換為 MP3
         console.log(`[YouTube] 執行 yt-dlp 下載命令...`);
         const result = await youtubeDlExec(youtubeUrl, {
           format: 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
           output: outputTemplate,
+          extractAudio: true,
+          audioFormat: 'mp3',
+          audioQuality: '0', // 最佳品質
           noWarnings: true,
           noCallHome: true,
           noCheckCertificate: true,
