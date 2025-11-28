@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, user_id, youtube_url, status FROM podcast_tasks ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT id, user_id, youtube_url, status FROM podcast_tasks ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "570008",
+      "user_id": "1",
+      "youtube_url": "https://www.youtube.com/watch?v=sOsqXKr4l30",
+      "status": "completed"
+    },
+    {
+      "id": "540001",
+      "user_id": "1",
+      "youtube_url": "https://www.youtube.com/watch?v=nsn94Ad47GY&t=367s",
+      "status": "completed"
+    },
+    {
+      "id": "480007",
+      "user_id": "1",
+      "youtube_url": "https://www.youtube.com/watch?v=vR4D8UvbzqU",
+      "status": "completed"
+    },
+    {
+      "id": "480006",
+      "user_id": "1",
+      "youtube_url": "https://www.youtube.com/watch?v=vR4D8UvbzqU",
+      "status": "completed"
+    },
+    {
+      "id": "480001",
+      "user_id": "1",
+      "youtube_url": "https://www.youtube.com/watch?v=vR4D8UvbzqU",
+      "status": "failed"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuser_id\tyoutube_url\tstatus\n570008\t1\thttps://www.youtube.com/watch?v=sOsqXKr4l30\tcompleted\n540001\t1\thttps://www.youtube.com/watch?v=nsn94Ad47GY&t=367s\tcompleted\n480007\t1\thttps://www.youtube.com/watch?v=vR4D8UvbzqU\tcompleted\n480006\t1\thttps://www.youtube.com/watch?v=vR4D8UvbzqU\tcompleted\n480001\t1\thttps://www.youtube.com/watch?v=vR4D8UvbzqU\tfailed\n",
+  "stderr": "",
+  "execution_time_ms": 1598
+}

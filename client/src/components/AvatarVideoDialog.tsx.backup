@@ -1,0 +1,103 @@
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Loader2 } from "lucide-react";
+
+interface AvatarVideoDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (avatarImageUrl: string, mode: "std" | "pro") => void;
+  isLoading?: boolean;
+}
+
+export function AvatarVideoDialog({
+  open,
+  onOpenChange,
+  onSubmit,
+  isLoading = false,
+}: AvatarVideoDialogProps) {
+  const [avatarImageUrl, setAvatarImageUrl] = useState("");
+  const [mode, setMode] = useState<"std" | "pro">("std");
+
+  const handleSubmit = () => {
+    if (!avatarImageUrl.trim()) {
+      return;
+    }
+    onSubmit(avatarImageUrl, mode);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>生成虛擬主播影片</DialogTitle>
+          <DialogDescription>
+            使用 Kling AI 將音檔轉換成帶虛擬主播的影片
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="avatar-image">虛擬主播頭像 URL</Label>
+            <Input
+              id="avatar-image"
+              placeholder="https://example.com/avatar.jpg"
+              value={avatarImageUrl}
+              onChange={(e) => setAvatarImageUrl(e.target.value)}
+              disabled={isLoading}
+            />
+            <p className="text-xs text-muted-foreground">
+              請提供虛擬主播頭像圖片的 URL（JPG/PNG，最大 10MB，最小 300px）
+            </p>
+          </div>
+          <div className="grid gap-2">
+            <Label>生成模式</Label>
+            <RadioGroup
+              value={mode}
+              onValueChange={(value) => setMode(value as "std" | "pro")}
+              disabled={isLoading}
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="std" id="std" />
+                <Label htmlFor="std" className="font-normal cursor-pointer">
+                  標準模式（成本較低）
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="pro" id="pro" />
+                <Label htmlFor="pro" className="font-normal cursor-pointer">
+                  專業模式（品質更高）
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            取消
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isLoading || !avatarImageUrl.trim()}
+          >
+            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            生成影片
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

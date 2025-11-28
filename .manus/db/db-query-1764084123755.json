@@ -1,0 +1,40 @@
+{
+  "query": "SELECT avt.id, avt.highlight_id, avt.status, avt.error_message, avt.created_at,\n       ph.title, ph.duration, ph.audio_url\nFROM avatar_video_tasks avt\nLEFT JOIN podcast_highlights ph ON avt.highlight_id = ph.id\nWHERE avt.status = 'failed'\nORDER BY avt.created_at DESC\nLIMIT 3;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT avt.id, avt.highlight_id, avt.status, avt.error_message, avt.created_at,\n       ph.title, ph.duration, ph.audio_url\nFROM avatar_video_tasks avt\nLEFT JOIN podcast_highlights ph ON avt.highlight_id = ph.id\nWHERE avt.status = 'failed'\nORDER BY avt.created_at DESC\nLIMIT 3;",
+  "rows": [
+    {
+      "id": "90001",
+      "highlight_id": "90002",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:13:32",
+      "title": "內容探針策略：如何用五步驗證市場需求？",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3"
+    },
+    {
+      "id": "60001",
+      "highlight_id": "90002",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:01:08",
+      "title": "內容探針策略：如何用五步驗證市場需求？",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3"
+    },
+    {
+      "id": "30001",
+      "highlight_id": "30001",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Account balance not enough",
+      "created_at": "2025-11-25 13:54:21",
+      "title": "職場危機處理黃金法則：飛行員的「三部曲」策略",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078821653_g7g23a.mp3"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\thighlight_id\tstatus\terror_message\tcreated_at\ttitle\tduration\taudio_url\n90001\t90002\tfailed\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:13:32\t內容探針策略：如何用五步驗證市場需求？\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3\n60001\t90002\tfailed\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:01:08\t內容探針策略：如何用五步驗證市場需求？\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3\n30001\t30001\tfailed\tKling AI API 錯誤: Account balance not enough\t2025-11-25 13:54:21\t職場危機處理黃金法則：飛行員的「三部曲」策略\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078821653_g7g23a.mp3\n",
+  "stderr": "",
+  "execution_time_ms": 1696
+}

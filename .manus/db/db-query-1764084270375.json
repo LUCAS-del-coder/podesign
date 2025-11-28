@@ -1,0 +1,65 @@
+{
+  "query": "SELECT avt.id, avt.highlight_id, avt.status, avt.kling_task_id, avt.video_url, avt.error_message, avt.created_at,\n       ph.title, ph.duration\nFROM avatar_video_tasks avt\nLEFT JOIN podcast_highlights ph ON avt.highlight_id = ph.id\nORDER BY avt.created_at DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT avt.id, avt.highlight_id, avt.status, avt.kling_task_id, avt.video_url, avt.error_message, avt.created_at,\n       ph.title, ph.duration\nFROM avatar_video_tasks avt\nLEFT JOIN podcast_highlights ph ON avt.highlight_id = ph.id\nORDER BY avt.created_at DESC;",
+  "rows": [
+    {
+      "id": "90001",
+      "highlight_id": "90002",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:13:32",
+      "title": "內容探針策略：如何用五步驗證市場需求？",
+      "duration": "60"
+    },
+    {
+      "id": "60001",
+      "highlight_id": "90002",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:01:08",
+      "title": "內容探針策略：如何用五步驗證市場需求？",
+      "duration": "60"
+    },
+    {
+      "id": "30001",
+      "highlight_id": "30001",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Account balance not enough",
+      "created_at": "2025-11-25 13:54:21",
+      "title": "職場危機處理黃金法則：飛行員的「三部曲」策略",
+      "duration": "60"
+    },
+    {
+      "id": "2",
+      "highlight_id": "NULL",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Audio size is too large",
+      "created_at": "2025-11-25 09:04:01",
+      "title": "NULL",
+      "duration": "NULL"
+    },
+    {
+      "id": "1",
+      "highlight_id": "NULL",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 09:02:55",
+      "title": "NULL",
+      "duration": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\thighlight_id\tstatus\tkling_task_id\tvideo_url\terror_message\tcreated_at\ttitle\tduration\n90001\t90002\tfailed\tNULL\tNULL\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:13:32\t內容探針策略：如何用五步驗證市場需求？\t60\n60001\t90002\tfailed\tNULL\tNULL\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:01:08\t內容探針策略：如何用五步驗證市場需求？\t60\n30001\t30001\tfailed\tNULL\tNULL\tKling AI API 錯誤: Account balance not enough\t2025-11-25 13:54:21\t職場危機處理黃金法則：飛行員的「三部曲」策略\t60\n2\tNULL\tfailed\tNULL\tNULL\tKling AI API 錯誤: Audio size is too large\t2025-11-25 09:04:01\tNULL\tNULL\n1\tNULL\tfailed\tNULL\tNULL\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 09:02:55\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 1603
+}

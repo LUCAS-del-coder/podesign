@@ -1,0 +1,19 @@
+{
+  "query": "SELECT \n  id,\n  task_id,\n  highlight_id,\n  status,\n  error_message,\n  created_at,\n  updated_at\nFROM avatar_video_tasks\nWHERE created_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)\nORDER BY created_at DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  id,\n  task_id,\n  highlight_id,\n  status,\n  error_message,\n  created_at,\n  updated_at\nFROM avatar_video_tasks\nWHERE created_at >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)\nORDER BY created_at DESC;",
+  "rows": [
+    {
+      "id": "150001",
+      "task_id": "NULL",
+      "highlight_id": "120004",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-26 02:57:31",
+      "updated_at": "2025-11-26 02:57:32"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttask_id\thighlight_id\tstatus\terror_message\tcreated_at\tupdated_at\n150001\tNULL\t120004\tfailed\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-26 02:57:31\t2025-11-26 02:57:32\n",
+  "stderr": "",
+  "execution_time_ms": 1599
+}

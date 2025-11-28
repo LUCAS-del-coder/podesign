@@ -1,0 +1,1 @@
+ALTER TABLE `podcast_tasks` ADD `title` varchar(512);

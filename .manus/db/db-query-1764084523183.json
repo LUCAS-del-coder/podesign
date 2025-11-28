@@ -1,0 +1,20 @@
+{
+  "query": "SELECT \n  'highlights' as type,\n  COUNT(*) as count,\n  MAX(created_at) as latest\nFROM podcast_highlights\nUNION ALL\nSELECT \n  'avatar_videos' as type,\n  COUNT(*) as count,\n  MAX(created_at) as latest\nFROM avatar_video_tasks;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  'highlights' as type,\n  COUNT(*) as count,\n  MAX(created_at) as latest\nFROM podcast_highlights\nUNION ALL\nSELECT \n  'avatar_videos' as type,\n  COUNT(*) as count,\n  MAX(created_at) as latest\nFROM avatar_video_tasks;",
+  "rows": [
+    {
+      "type": "avatar_videos",
+      "count": "0",
+      "latest": "NULL"
+    },
+    {
+      "type": "highlights",
+      "count": "0",
+      "latest": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "type\tcount\tlatest\navatar_videos\t0\tNULL\nhighlights\t0\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 1661
+}

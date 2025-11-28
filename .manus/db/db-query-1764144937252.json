@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE podcast_tasks SET user_id = 1 WHERE user_id IS NULL OR user_id = 0;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute UPDATE podcast_tasks SET user_id = 1 WHERE user_id IS NULL OR user_id = 0;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1622
+}

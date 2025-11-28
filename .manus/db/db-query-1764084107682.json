@@ -1,0 +1,65 @@
+{
+  "query": "SELECT id, task_id, highlight_id, status, kling_task_id, video_url, error_message, created_at, updated_at \nFROM avatar_video_tasks \nORDER BY created_at DESC \nLIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT id, task_id, highlight_id, status, kling_task_id, video_url, error_message, created_at, updated_at \nFROM avatar_video_tasks \nORDER BY created_at DESC \nLIMIT 10;",
+  "rows": [
+    {
+      "id": "90001",
+      "task_id": "NULL",
+      "highlight_id": "90002",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:13:32",
+      "updated_at": "2025-11-25 15:13:33"
+    },
+    {
+      "id": "60001",
+      "task_id": "NULL",
+      "highlight_id": "90002",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:01:08",
+      "updated_at": "2025-11-25 15:01:11"
+    },
+    {
+      "id": "30001",
+      "task_id": "NULL",
+      "highlight_id": "30001",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Account balance not enough",
+      "created_at": "2025-11-25 13:54:21",
+      "updated_at": "2025-11-25 13:54:24"
+    },
+    {
+      "id": "2",
+      "task_id": "480006",
+      "highlight_id": "NULL",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Audio size is too large",
+      "created_at": "2025-11-25 09:04:01",
+      "updated_at": "2025-11-25 09:04:03"
+    },
+    {
+      "id": "1",
+      "task_id": "480007",
+      "highlight_id": "NULL",
+      "status": "failed",
+      "kling_task_id": "NULL",
+      "video_url": "NULL",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 09:02:55",
+      "updated_at": "2025-11-25 09:02:57"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttask_id\thighlight_id\tstatus\tkling_task_id\tvideo_url\terror_message\tcreated_at\tupdated_at\n90001\tNULL\t90002\tfailed\tNULL\tNULL\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:13:32\t2025-11-25 15:13:33\n60001\tNULL\t90002\tfailed\tNULL\tNULL\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:01:08\t2025-11-25 15:01:11\n30001\tNULL\t30001\tfailed\tNULL\tNULL\tKling AI API 錯誤: Account balance not enough\t2025-11-25 13:54:21\t2025-11-25 13:54:24\n2\t480006\tNULL\tfailed\tNULL\tNULL\tKling AI API 錯誤: Audio size is too large\t2025-11-25 09:04:01\t2025-11-25 09:04:03\n1\t480007\tNULL\tfailed\tNULL\tNULL\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 09:02:55\t2025-11-25 09:02:57\n",
+  "stderr": "",
+  "execution_time_ms": 1601
+}

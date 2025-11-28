@@ -1,0 +1,28 @@
+{
+  "query": "SELECT id, youtube_url, error_message, created_at FROM podcast_tasks WHERE status = 'failed' ORDER BY id DESC LIMIT 3",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT id, youtube_url, error_message, created_at FROM podcast_tasks WHERE status = 'failed' ORDER BY id DESC LIMIT 3",
+  "rows": [
+    {
+      "id": "480005",
+      "youtube_url": "https://www.youtube.com/watch?v=vR4D8UvbzqU",
+      "error_message": "無法轉錄 YouTube 影片: 找不到下載的音訊檔案。請確認 YouTube 影片是否可用且沒有地區限制。",
+      "created_at": "2025-11-25 07:05:54"
+    },
+    {
+      "id": "480004",
+      "youtube_url": "https://www.youtube.com/watch?v=vR4D8UvbzqU",
+      "error_message": "無法轉錄 YouTube 影片: 找不到下載的音訊檔案。請確認 YouTube 影片是否可用且沒有地區限制。",
+      "created_at": "2025-11-25 07:01:03"
+    },
+    {
+      "id": "480003",
+      "youtube_url": "https://www.youtube.com/watch?v=vR4D8UvbzqU",
+      "error_message": "無法轉錄 YouTube 影片: 找不到下載的音訊檔案。請確認 YouTube 影片是否可用且沒有地區限制。",
+      "created_at": "2025-11-25 06:57:26"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tyoutube_url\terror_message\tcreated_at\n480005\thttps://www.youtube.com/watch?v=vR4D8UvbzqU\t無法轉錄 YouTube 影片: 找不到下載的音訊檔案。請確認 YouTube 影片是否可用且沒有地區限制。\t2025-11-25 07:05:54\n480004\thttps://www.youtube.com/watch?v=vR4D8UvbzqU\t無法轉錄 YouTube 影片: 找不到下載的音訊檔案。請確認 YouTube 影片是否可用且沒有地區限制。\t2025-11-25 07:01:03\n480003\thttps://www.youtube.com/watch?v=vR4D8UvbzqU\t無法轉錄 YouTube 影片: 找不到下載的音訊檔案。請確認 YouTube 影片是否可用且沒有地區限制。\t2025-11-25 06:57:26\n",
+  "stderr": "",
+  "execution_time_ms": 1540
+}

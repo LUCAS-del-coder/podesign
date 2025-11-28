@@ -1,0 +1,20 @@
+CREATE TABLE `avatar_video_tasks` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`user_id` int NOT NULL,
+	`highlight_id` int NOT NULL,
+	`kling_task_id` varchar(128),
+	`external_task_id` varchar(128),
+	`status` enum('pending','submitted','processing','completed','failed') NOT NULL DEFAULT 'pending',
+	`status_message` text,
+	`avatar_image_url` text,
+	`audio_url` text,
+	`prompt` text,
+	`mode` varchar(16) DEFAULT 'std',
+	`video_url` text,
+	`video_id` varchar(128),
+	`duration` int,
+	`error_message` text,
+	`created_at` timestamp NOT NULL DEFAULT (now()),
+	`updated_at` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `avatar_video_tasks_id` PRIMARY KEY(`id`)
+);

@@ -1,0 +1,82 @@
+{
+  "query": "SELECT id, task_id, title, duration, \nCASE WHEN audio_url IS NULL THEN 'NO' ELSE 'YES' END as has_audio,\ncreated_at \nFROM podcast_highlights \nORDER BY created_at DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT id, task_id, title, duration, \nCASE WHEN audio_url IS NULL THEN 'NO' ELSE 'YES' END as has_audio,\ncreated_at \nFROM podcast_highlights \nORDER BY created_at DESC;",
+  "rows": [
+    {
+      "id": "60003",
+      "task_id": "540001",
+      "title": "總結：想做產品的人必聽的三大啟示",
+      "duration": "59",
+      "has_audio": "YES",
+      "created_at": "2025-11-25 14:34:13"
+    },
+    {
+      "id": "60002",
+      "task_id": "540001",
+      "title": "產品的生命力：為什麼創辦人的真實故事最能打動人心？",
+      "duration": "60",
+      "has_audio": "YES",
+      "created_at": "2025-11-25 14:34:11"
+    },
+    {
+      "id": "60001",
+      "task_id": "540001",
+      "title": "內容先行，產品在後：顛覆傳統App開發的市場驗證法",
+      "duration": "60",
+      "has_audio": "YES",
+      "created_at": "2025-11-25 14:34:07"
+    },
+    {
+      "id": "30003",
+      "task_id": "510001",
+      "title": "重建信任的藝術：不是道歉，而是持續的「種樹」過程",
+      "duration": "42",
+      "has_audio": "YES",
+      "created_at": "2025-11-25 13:53:49"
+    },
+    {
+      "id": "30002",
+      "task_id": "510001",
+      "title": "犯錯後如何避免小坑變大窟窿？關鍵在於「導航局勢」",
+      "duration": "60",
+      "has_audio": "YES",
+      "created_at": "2025-11-25 13:53:47"
+    },
+    {
+      "id": "30001",
+      "task_id": "510001",
+      "title": "職場危機處理黃金法則：飛行員的「三部曲」策略",
+      "duration": "60",
+      "has_audio": "YES",
+      "created_at": "2025-11-25 13:53:43"
+    },
+    {
+      "id": "3",
+      "task_id": "480007",
+      "title": "從被動救火到主動防火：A-GAS的終極價值",
+      "duration": "103",
+      "has_audio": "YES",
+      "created_at": "2025-11-25 07:39:28"
+    },
+    {
+      "id": "2",
+      "task_id": "480007",
+      "title": "危機處理SOP：記住「四個不要」和處理順序",
+      "duration": "75",
+      "has_audio": "YES",
+      "created_at": "2025-11-25 07:39:25"
+    },
+    {
+      "id": "1",
+      "task_id": "480007",
+      "title": "錯誤分級：不是所有錯誤都一樣嚴重",
+      "duration": "92",
+      "has_audio": "YES",
+      "created_at": "2025-11-25 07:39:21"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttask_id\ttitle\tduration\thas_audio\tcreated_at\n60003\t540001\t總結：想做產品的人必聽的三大啟示\t59\tYES\t2025-11-25 14:34:13\n60002\t540001\t產品的生命力：為什麼創辦人的真實故事最能打動人心？\t60\tYES\t2025-11-25 14:34:11\n60001\t540001\t內容先行，產品在後：顛覆傳統App開發的市場驗證法\t60\tYES\t2025-11-25 14:34:07\n30003\t510001\t重建信任的藝術：不是道歉，而是持續的「種樹」過程\t42\tYES\t2025-11-25 13:53:49\n30002\t510001\t犯錯後如何避免小坑變大窟窿？關鍵在於「導航局勢」\t60\tYES\t2025-11-25 13:53:47\n30001\t510001\t職場危機處理黃金法則：飛行員的「三部曲」策略\t60\tYES\t2025-11-25 13:53:43\n3\t480007\t從被動救火到主動防火：A-GAS的終極價值\t103\tYES\t2025-11-25 07:39:28\n2\t480007\t危機處理SOP：記住「四個不要」和處理順序\t75\tYES\t2025-11-25 07:39:25\n1\t480007\t錯誤分級：不是所有錯誤都一樣嚴重\t92\tYES\t2025-11-25 07:39:21\n",
+  "stderr": "",
+  "execution_time_ms": 1579
+}

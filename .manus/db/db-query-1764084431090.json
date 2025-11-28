@@ -1,0 +1,9 @@
+{
+  "query": "DELETE FROM avatar_video_tasks;\nDELETE FROM podcast_highlights;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute DELETE FROM avatar_video_tasks;\nDELETE FROM podcast_highlights;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1743
+}

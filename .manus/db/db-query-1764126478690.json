@@ -1,0 +1,19 @@
+{
+  "query": "SELECT \n  COUNT(*) as total,\n  SUM(CASE WHEN duration IS NULL THEN 1 ELSE 0 END) as null_count,\n  SUM(CASE WHEN duration = 0 THEN 1 ELSE 0 END) as zero_count,\n  SUM(CASE WHEN duration > 0 AND duration <= 60 THEN 1 ELSE 0 END) as valid_count,\n  SUM(CASE WHEN duration > 60 THEN 1 ELSE 0 END) as over_limit_count,\n  MAX(duration) as max_duration,\n  MIN(duration) as min_duration\nFROM podcast_highlights;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  COUNT(*) as total,\n  SUM(CASE WHEN duration IS NULL THEN 1 ELSE 0 END) as null_count,\n  SUM(CASE WHEN duration = 0 THEN 1 ELSE 0 END) as zero_count,\n  SUM(CASE WHEN duration > 0 AND duration <= 60 THEN 1 ELSE 0 END) as valid_count,\n  SUM(CASE WHEN duration > 60 THEN 1 ELSE 0 END) as over_limit_count,\n  MAX(duration) as max_duration,\n  MIN(duration) as min_duration\nFROM podcast_highlights;",
+  "rows": [
+    {
+      "total": "9",
+      "null_count": "0",
+      "zero_count": "0",
+      "valid_count": "9",
+      "over_limit_count": "0",
+      "max_duration": "60",
+      "min_duration": "60"
+    }
+  ],
+  "messages": [],
+  "stdout": "total\tnull_count\tzero_count\tvalid_count\tover_limit_count\tmax_duration\tmin_duration\n9\t0\t0\t9\t0\t60\t60\n",
+  "stderr": "",
+  "execution_time_ms": 1555
+}

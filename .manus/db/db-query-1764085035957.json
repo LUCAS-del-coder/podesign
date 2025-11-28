@@ -1,0 +1,9 @@
+{
+  "query": "SELECT \n  id,\n  status,\n  video_url,\n  error_message,\n  updated_at\nFROM avatar_video_tasks\nWHERE id = 120001;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  id,\n  status,\n  video_url,\n  error_message,\n  updated_at\nFROM avatar_video_tasks\nWHERE id = 120001;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1569
+}

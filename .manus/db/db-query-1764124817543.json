@@ -1,0 +1,37 @@
+{
+  "query": "SELECT \n  id,\n  task_id,\n  highlight_id,\n  status,\n  error_message,\n  created_at,\n  updated_at\nFROM avatar_video_tasks\nORDER BY created_at DESC\nLIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  id,\n  task_id,\n  highlight_id,\n  status,\n  error_message,\n  created_at,\n  updated_at\nFROM avatar_video_tasks\nORDER BY created_at DESC\nLIMIT 5;",
+  "rows": [
+    {
+      "id": "120001",
+      "task_id": "NULL",
+      "highlight_id": "120001",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-26 02:39:09",
+      "updated_at": "2025-11-26 02:39:10"
+    },
+    {
+      "id": "90003",
+      "task_id": "NULL",
+      "highlight_id": "120004",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:42:08",
+      "updated_at": "2025-11-25 15:42:13"
+    },
+    {
+      "id": "90002",
+      "task_id": "NULL",
+      "highlight_id": "120007",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:33:45",
+      "updated_at": "2025-11-25 15:33:47"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttask_id\thighlight_id\tstatus\terror_message\tcreated_at\tupdated_at\n120001\tNULL\t120001\tfailed\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-26 02:39:09\t2025-11-26 02:39:10\n90003\tNULL\t120004\tfailed\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:42:08\t2025-11-25 15:42:13\n90002\tNULL\t120007\tfailed\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:33:45\t2025-11-25 15:33:47\n",
+  "stderr": "",
+  "execution_time_ms": 1926
+}

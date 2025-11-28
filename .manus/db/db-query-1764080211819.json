@@ -1,0 +1,65 @@
+{
+  "query": "SELECT id, task_id, title, description, start_time, end_time, duration, audio_url, created_at \nFROM podcast_highlights \nORDER BY created_at DESC \nLIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT id, task_id, title, description, start_time, end_time, duration, audio_url, created_at \nFROM podcast_highlights \nORDER BY created_at DESC \nLIMIT 5;",
+  "rows": [
+    {
+      "id": "30003",
+      "task_id": "510001",
+      "title": "重建信任的藝術：不是道歉，而是持續的「種樹」過程",
+      "description": "將重建信任比喻為種樹，需要真誠道歉、承擔責任，並透過後續透明且持續的行動來證明改變。",
+      "start_time": "393",
+      "end_time": "435",
+      "duration": "42",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078828637_iee07g.mp3",
+      "created_at": "2025-11-25 13:53:49"
+    },
+    {
+      "id": "30002",
+      "task_id": "510001",
+      "title": "犯錯後如何避免小坑變大窟窿？關鍵在於「導航局勢」",
+      "description": "解釋了危機處理第二步：導航局勢。強調冷靜評估、規劃，並做好最壞打算，避免盲目行動擴大危機。",
+      "start_time": "216",
+      "end_time": "276",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078825518_5pxiep.mp3",
+      "created_at": "2025-11-25 13:53:47"
+    },
+    {
+      "id": "30001",
+      "task_id": "510001",
+      "title": "職場危機處理黃金法則：飛行員的「三部曲」策略",
+      "description": "從飛行員應急策略中學會處理危機的「三部曲」：穩定、導航、溝通，這是職場應對爛攤子的實用框架。",
+      "start_time": "143",
+      "end_time": "203",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078821653_g7g23a.mp3",
+      "created_at": "2025-11-25 13:53:43"
+    },
+    {
+      "id": "3",
+      "task_id": "480007",
+      "title": "從被動救火到主動防火：A-GAS的終極價值",
+      "description": "探討處理錯誤的終極目標：從救火隊員變成工程師。解釋『A-GAS』精神，強調專業精神和系統性預防的重要性。",
+      "start_time": "280",
+      "end_time": "383",
+      "duration": "103",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056367163_gdy8su.mp3",
+      "created_at": "2025-11-25 07:39:28"
+    },
+    {
+      "id": "2",
+      "task_id": "480007",
+      "title": "危機處理SOP：記住「四個不要」和處理順序",
+      "description": "職場救命稻草！介紹了危機處理的實用SOP，特別是『四個不要』和『先止損、再修復、後談補償』的邏輯，非常實用。",
+      "start_time": "162",
+      "end_time": "237",
+      "duration": "75",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056362930_240jdt.mp3",
+      "created_at": "2025-11-25 07:39:25"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttask_id\ttitle\tdescription\tstart_time\tend_time\tduration\taudio_url\tcreated_at\n30003\t510001\t重建信任的藝術：不是道歉，而是持續的「種樹」過程\t將重建信任比喻為種樹，需要真誠道歉、承擔責任，並透過後續透明且持續的行動來證明改變。\t393\t435\t42\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078828637_iee07g.mp3\t2025-11-25 13:53:49\n30002\t510001\t犯錯後如何避免小坑變大窟窿？關鍵在於「導航局勢」\t解釋了危機處理第二步：導航局勢。強調冷靜評估、規劃，並做好最壞打算，避免盲目行動擴大危機。\t216\t276\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078825518_5pxiep.mp3\t2025-11-25 13:53:47\n30001\t510001\t職場危機處理黃金法則：飛行員的「三部曲」策略\t從飛行員應急策略中學會處理危機的「三部曲」：穩定、導航、溝通，這是職場應對爛攤子的實用框架。\t143\t203\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078821653_g7g23a.mp3\t2025-11-25 13:53:43\n3\t480007\t從被動救火到主動防火：A-GAS的終極價值\t探討處理錯誤的終極目標：從救火隊員變成工程師。解釋『A-GAS』精神，強調專業精神和系統性預防的重要性。\t280\t383\t103\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056367163_gdy8su.mp3\t2025-11-25 07:39:28\n2\t480007\t危機處理SOP：記住「四個不要」和處理順序\t職場救命稻草！介紹了危機處理的實用SOP，特別是『四個不要』和『先止損、再修復、後談補償』的邏輯，非常實用。\t162\t237\t75\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056362930_240jdt.mp3\t2025-11-25 07:39:25\n",
+  "stderr": "",
+  "execution_time_ms": 1614
+}

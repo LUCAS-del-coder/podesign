@@ -1,0 +1,50 @@
+{
+  "query": "SELECT \n  id,\n  youtube_url,\n  title,\n  status,\n  CASE \n    WHEN podcast_audio_url IS NOT NULL AND podcast_audio_url != '' THEN '✅ 有 Podcast 音檔'\n    WHEN audio_url IS NOT NULL AND audio_url != '' THEN '✅ 有原始音檔'\n    ELSE '❌ 無音檔'\n  END as audio_status,\n  created_at\nFROM podcast_tasks\nWHERE status = 'completed'\nORDER BY created_at DESC\nLIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  id,\n  youtube_url,\n  title,\n  status,\n  CASE \n    WHEN podcast_audio_url IS NOT NULL AND podcast_audio_url != '' THEN '✅ 有 Podcast 音檔'\n    WHEN audio_url IS NOT NULL AND audio_url != '' THEN '✅ 有原始音檔'\n    ELSE '❌ 無音檔'\n  END as audio_status,\n  created_at\nFROM podcast_tasks\nWHERE status = 'completed'\nORDER BY created_at DESC\nLIMIT 5;",
+  "rows": [
+    {
+      "id": "540002",
+      "youtube_url": "https://www.youtube.com/watch?v=nsn94Ad47GY&t=367s",
+      "title": "How We Built It: $85K Mobile App",
+      "status": "completed",
+      "audio_status": "✅ 有 Podcast 音檔",
+      "created_at": "2025-11-25 14:50:29"
+    },
+    {
+      "id": "540001",
+      "youtube_url": "https://www.youtube.com/watch?v=nsn94Ad47GY&t=367s",
+      "title": "How We Built It: $85K Mobile App",
+      "status": "completed",
+      "audio_status": "✅ 有 Podcast 音檔",
+      "created_at": "2025-11-25 14:28:35"
+    },
+    {
+      "id": "510001",
+      "youtube_url": "https://www.youtube.com/watch?v=vR4D8UvbzqU",
+      "title": "NULL",
+      "status": "completed",
+      "audio_status": "✅ 有 Podcast 音檔",
+      "created_at": "2025-11-25 09:25:40"
+    },
+    {
+      "id": "480007",
+      "youtube_url": "https://www.youtube.com/watch?v=vR4D8UvbzqU",
+      "title": "工作中捅了大篓子怎么办？",
+      "status": "completed",
+      "audio_status": "✅ 有 Podcast 音檔",
+      "created_at": "2025-11-25 07:26:00"
+    },
+    {
+      "id": "480006",
+      "youtube_url": "https://www.youtube.com/watch?v=vR4D8UvbzqU",
+      "title": "工作中捅了大篓子怎么办？",
+      "status": "completed",
+      "audio_status": "✅ 有 Podcast 音檔",
+      "created_at": "2025-11-25 07:14:23"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tyoutube_url\ttitle\tstatus\taudio_status\tcreated_at\n540002\thttps://www.youtube.com/watch?v=nsn94Ad47GY&t=367s\tHow We Built It: $85K Mobile App\tcompleted\t✅ 有 Podcast 音檔\t2025-11-25 14:50:29\n540001\thttps://www.youtube.com/watch?v=nsn94Ad47GY&t=367s\tHow We Built It: $85K Mobile App\tcompleted\t✅ 有 Podcast 音檔\t2025-11-25 14:28:35\n510001\thttps://www.youtube.com/watch?v=vR4D8UvbzqU\tNULL\tcompleted\t✅ 有 Podcast 音檔\t2025-11-25 09:25:40\n480007\thttps://www.youtube.com/watch?v=vR4D8UvbzqU\t工作中捅了大篓子怎么办？\tcompleted\t✅ 有 Podcast 音檔\t2025-11-25 07:26:00\n480006\thttps://www.youtube.com/watch?v=vR4D8UvbzqU\t工作中捅了大篓子怎么办？\tcompleted\t✅ 有 Podcast 音檔\t2025-11-25 07:14:23\n",
+  "stderr": "",
+  "execution_time_ms": 1619
+}

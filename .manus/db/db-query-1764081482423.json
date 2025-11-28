@@ -1,0 +1,40 @@
+{
+  "query": "SELECT id, task_id, title, start_time, end_time, duration, audio_url, created_at \nFROM podcast_highlights \nORDER BY created_at DESC \nLIMIT 3;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT id, task_id, title, start_time, end_time, duration, audio_url, created_at \nFROM podcast_highlights \nORDER BY created_at DESC \nLIMIT 3;",
+  "rows": [
+    {
+      "id": "60003",
+      "task_id": "540001",
+      "title": "總結：想做產品的人必聽的三大啟示",
+      "start_time": "285",
+      "end_time": "344",
+      "duration": "59",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081253484_dnkwp.mp3",
+      "created_at": "2025-11-25 14:34:13"
+    },
+    {
+      "id": "60002",
+      "task_id": "540001",
+      "title": "產品的生命力：為什麼創辦人的真實故事最能打動人心？",
+      "start_time": "180",
+      "end_time": "240",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081249900_nqdgf.mp3",
+      "created_at": "2025-11-25 14:34:11"
+    },
+    {
+      "id": "60001",
+      "task_id": "540001",
+      "title": "內容先行，產品在後：顛覆傳統App開發的市場驗證法",
+      "start_time": "0",
+      "end_time": "60",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081246125_0dy7y.mp3",
+      "created_at": "2025-11-25 14:34:07"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttask_id\ttitle\tstart_time\tend_time\tduration\taudio_url\tcreated_at\n60003\t540001\t總結：想做產品的人必聽的三大啟示\t285\t344\t59\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081253484_dnkwp.mp3\t2025-11-25 14:34:13\n60002\t540001\t產品的生命力：為什麼創辦人的真實故事最能打動人心？\t180\t240\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081249900_nqdgf.mp3\t2025-11-25 14:34:11\n60001\t540001\t內容先行，產品在後：顛覆傳統App開發的市場驗證法\t0\t60\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081246125_0dy7y.mp3\t2025-11-25 14:34:07\n",
+  "stderr": "",
+  "execution_time_ms": 1688
+}

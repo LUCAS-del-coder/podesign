@@ -1,0 +1,46 @@
+{
+  "query": "SELECT \n  avt.id as task_id,\n  avt.highlight_id,\n  avt.status,\n  avt.error_message,\n  avt.created_at,\n  ph.title as highlight_title,\n  ph.duration as highlight_duration,\n  ph.audio_url as highlight_audio_url,\n  ph.start_time,\n  ph.end_time\nFROM avatar_video_tasks avt\nLEFT JOIN podcast_highlights ph ON avt.highlight_id = ph.id\nWHERE avt.created_at >= '2025-01-25 10:00:00'\nORDER BY avt.created_at DESC\nLIMIT 3;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  avt.id as task_id,\n  avt.highlight_id,\n  avt.status,\n  avt.error_message,\n  avt.created_at,\n  ph.title as highlight_title,\n  ph.duration as highlight_duration,\n  ph.audio_url as highlight_audio_url,\n  ph.start_time,\n  ph.end_time\nFROM avatar_video_tasks avt\nLEFT JOIN podcast_highlights ph ON avt.highlight_id = ph.id\nWHERE avt.created_at >= '2025-01-25 10:00:00'\nORDER BY avt.created_at DESC\nLIMIT 3;",
+  "rows": [
+    {
+      "task_id": "90001",
+      "highlight_id": "90002",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:13:32",
+      "highlight_title": "內容探針策略：如何用五步驗證市場需求？",
+      "highlight_duration": "60",
+      "highlight_audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3",
+      "start_time": "135",
+      "end_time": "195"
+    },
+    {
+      "task_id": "60001",
+      "highlight_id": "90002",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "created_at": "2025-11-25 15:01:08",
+      "highlight_title": "內容探針策略：如何用五步驗證市場需求？",
+      "highlight_duration": "60",
+      "highlight_audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3",
+      "start_time": "135",
+      "end_time": "195"
+    },
+    {
+      "task_id": "30001",
+      "highlight_id": "30001",
+      "status": "failed",
+      "error_message": "Kling AI API 錯誤: Account balance not enough",
+      "created_at": "2025-11-25 13:54:21",
+      "highlight_title": "職場危機處理黃金法則：飛行員的「三部曲」策略",
+      "highlight_duration": "60",
+      "highlight_audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078821653_g7g23a.mp3",
+      "start_time": "143",
+      "end_time": "203"
+    }
+  ],
+  "messages": [],
+  "stdout": "task_id\thighlight_id\tstatus\terror_message\tcreated_at\thighlight_title\thighlight_duration\thighlight_audio_url\tstart_time\tend_time\n90001\t90002\tfailed\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:13:32\t內容探針策略：如何用五步驗證市場需求？\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3\t135\t195\n60001\t90002\tfailed\tKling AI API 錯誤: Audio duration can not longer than 60s\t2025-11-25 15:01:08\t內容探針策略：如何用五步驗證市場需求？\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3\t135\t195\n30001\t30001\tfailed\tKling AI API 錯誤: Account balance not enough\t2025-11-25 13:54:21\t職場危機處理黃金法則：飛行員的「三部曲」策略\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078821653_g7g23a.mp3\t143\t203\n",
+  "stderr": "",
+  "execution_time_ms": 1496
+}

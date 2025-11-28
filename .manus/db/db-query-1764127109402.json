@@ -1,0 +1,13 @@
+{
+  "query": "SELECT COUNT(*) as count FROM podcast_highlights WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT COUNT(*) as count FROM podcast_highlights WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE);",
+  "rows": [
+    {
+      "count": "3"
+    }
+  ],
+  "messages": [],
+  "stdout": "count\n3\n",
+  "stderr": "",
+  "execution_time_ms": 1564
+}

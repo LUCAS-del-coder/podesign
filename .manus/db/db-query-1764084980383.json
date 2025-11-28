@@ -1,0 +1,65 @@
+{
+  "query": "SELECT \n  ph.id as highlight_id,\n  ph.title,\n  ph.duration,\n  ph.audio_url,\n  avt.id as video_task_id,\n  avt.status as video_status,\n  avt.error_message,\n  avt.video_url,\n  avt.created_at as video_created_at\nFROM podcast_highlights ph\nLEFT JOIN avatar_video_tasks avt ON ph.id = avt.highlight_id\nWHERE ph.created_at >= '2025-01-25 10:30:00'\nORDER BY ph.created_at DESC\nLIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  ph.id as highlight_id,\n  ph.title,\n  ph.duration,\n  ph.audio_url,\n  avt.id as video_task_id,\n  avt.status as video_status,\n  avt.error_message,\n  avt.video_url,\n  avt.created_at as video_created_at\nFROM podcast_highlights ph\nLEFT JOIN avatar_video_tasks avt ON ph.id = avt.highlight_id\nWHERE ph.created_at >= '2025-01-25 10:30:00'\nORDER BY ph.created_at DESC\nLIMIT 5;",
+  "rows": [
+    {
+      "highlight_id": "120008",
+      "title": "內容先行策略：用內容當探針，降低App開發風險",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084823125_8rczm8.mp3",
+      "video_task_id": "NULL",
+      "video_status": "NULL",
+      "error_message": "NULL",
+      "video_url": "NULL",
+      "video_created_at": "NULL"
+    },
+    {
+      "highlight_id": "120009",
+      "title": "非技術創業者的路線圖：AI工具與高達50%的利潤率",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084824531_7whqgd.mp3",
+      "video_task_id": "NULL",
+      "video_status": "NULL",
+      "error_message": "NULL",
+      "video_url": "NULL",
+      "video_created_at": "NULL"
+    },
+    {
+      "highlight_id": "120007",
+      "title": "反直覺創業：不寫代碼，先做內容，八個月賺八萬五千美金",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084820769_13bvg.mp3",
+      "video_task_id": "90002",
+      "video_status": "failed",
+      "error_message": "Kling AI API 錯誤: Audio duration can not longer than 60s",
+      "video_url": "NULL",
+      "video_created_at": "2025-11-25 15:33:45"
+    },
+    {
+      "highlight_id": "120006",
+      "title": "非技術創業者的路線圖：AI與內容策略",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084789423_gdfqbb.mp3",
+      "video_task_id": "NULL",
+      "video_status": "NULL",
+      "error_message": "NULL",
+      "video_url": "NULL",
+      "video_created_at": "NULL"
+    },
+    {
+      "highlight_id": "120005",
+      "title": "50%超高利潤率的秘密：內容探針策略",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084786156_wq8f9kx.mp3",
+      "video_task_id": "NULL",
+      "video_status": "NULL",
+      "error_message": "NULL",
+      "video_url": "NULL",
+      "video_created_at": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "highlight_id\ttitle\tduration\taudio_url\tvideo_task_id\tvideo_status\terror_message\tvideo_url\tvideo_created_at\n120008\t內容先行策略：用內容當探針，降低App開發風險\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084823125_8rczm8.mp3\tNULL\tNULL\tNULL\tNULL\tNULL\n120009\t非技術創業者的路線圖：AI工具與高達50%的利潤率\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084824531_7whqgd.mp3\tNULL\tNULL\tNULL\tNULL\tNULL\n120007\t反直覺創業：不寫代碼，先做內容，八個月賺八萬五千美金\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084820769_13bvg.mp3\t90002\tfailed\tKling AI API 錯誤: Audio duration can not longer than 60s\tNULL\t2025-11-25 15:33:45\n120006\t非技術創業者的路線圖：AI與內容策略\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084789423_gdfqbb.mp3\tNULL\tNULL\tNULL\tNULL\tNULL\n120005\t50%超高利潤率的秘密：內容探針策略\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764084786156_wq8f9kx.mp3\tNULL\tNULL\tNULL\tNULL\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 1675
+}

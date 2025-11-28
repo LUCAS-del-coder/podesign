@@ -1,0 +1,118 @@
+{
+  "query": "SELECT \n  id,\n  task_id,\n  title,\n  duration,\n  audio_url,\n  created_at,\n  CASE \n    WHEN duration <= 60 THEN '✅ 可生成影片'\n    ELSE '❌ 超過限制'\n  END as status\nFROM podcast_highlights\nORDER BY created_at DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  id,\n  task_id,\n  title,\n  duration,\n  audio_url,\n  created_at,\n  CASE \n    WHEN duration <= 60 THEN '✅ 可生成影片'\n    ELSE '❌ 超過限制'\n  END as status\nFROM podcast_highlights\nORDER BY created_at DESC;",
+  "rows": [
+    {
+      "id": "90003",
+      "task_id": "540002",
+      "title": "非技術創業者的活路：AI與高利潤率的秘密",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082848973_wuz7.mp3",
+      "created_at": "2025-11-25 15:00:49",
+      "status": "✅ 可生成影片"
+    },
+    {
+      "id": "90002",
+      "task_id": "540002",
+      "title": "內容探針策略：如何用五步驗證市場需求？",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3",
+      "created_at": "2025-11-25 15:00:47",
+      "status": "✅ 可生成影片"
+    },
+    {
+      "id": "90001",
+      "task_id": "540002",
+      "title": "反直覺創業：先做內容，不寫程式",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082842134_wfekqo.mp3",
+      "created_at": "2025-11-25 15:00:43",
+      "status": "✅ 可生成影片"
+    },
+    {
+      "id": "60003",
+      "task_id": "540001",
+      "title": "總結：想做產品的人必聽的三大啟示",
+      "duration": "59",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081253484_dnkwp.mp3",
+      "created_at": "2025-11-25 14:34:13",
+      "status": "✅ 可生成影片"
+    },
+    {
+      "id": "60002",
+      "task_id": "540001",
+      "title": "產品的生命力：為什麼創辦人的真實故事最能打動人心？",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081249900_nqdgf.mp3",
+      "created_at": "2025-11-25 14:34:11",
+      "status": "✅ 可生成影片"
+    },
+    {
+      "id": "60001",
+      "task_id": "540001",
+      "title": "內容先行，產品在後：顛覆傳統App開發的市場驗證法",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081246125_0dy7y.mp3",
+      "created_at": "2025-11-25 14:34:07",
+      "status": "✅ 可生成影片"
+    },
+    {
+      "id": "30003",
+      "task_id": "510001",
+      "title": "重建信任的藝術：不是道歉，而是持續的「種樹」過程",
+      "duration": "42",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078828637_iee07g.mp3",
+      "created_at": "2025-11-25 13:53:49",
+      "status": "✅ 可生成影片"
+    },
+    {
+      "id": "30002",
+      "task_id": "510001",
+      "title": "犯錯後如何避免小坑變大窟窿？關鍵在於「導航局勢」",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078825518_5pxiep.mp3",
+      "created_at": "2025-11-25 13:53:47",
+      "status": "✅ 可生成影片"
+    },
+    {
+      "id": "30001",
+      "task_id": "510001",
+      "title": "職場危機處理黃金法則：飛行員的「三部曲」策略",
+      "duration": "60",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078821653_g7g23a.mp3",
+      "created_at": "2025-11-25 13:53:43",
+      "status": "✅ 可生成影片"
+    },
+    {
+      "id": "3",
+      "task_id": "480007",
+      "title": "從被動救火到主動防火：A-GAS的終極價值",
+      "duration": "103",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056367163_gdy8su.mp3",
+      "created_at": "2025-11-25 07:39:28",
+      "status": "❌ 超過限制"
+    },
+    {
+      "id": "2",
+      "task_id": "480007",
+      "title": "危機處理SOP：記住「四個不要」和處理順序",
+      "duration": "75",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056362930_240jdt.mp3",
+      "created_at": "2025-11-25 07:39:25",
+      "status": "❌ 超過限制"
+    },
+    {
+      "id": "1",
+      "task_id": "480007",
+      "title": "錯誤分級：不是所有錯誤都一樣嚴重",
+      "duration": "92",
+      "audio_url": "https://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056359781_3lvj1.mp3",
+      "created_at": "2025-11-25 07:39:21",
+      "status": "❌ 超過限制"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttask_id\ttitle\tduration\taudio_url\tcreated_at\tstatus\n90003\t540002\t非技術創業者的活路：AI與高利潤率的秘密\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082848973_wuz7.mp3\t2025-11-25 15:00:49\t✅ 可生成影片\n90002\t540002\t內容探針策略：如何用五步驗證市場需求？\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082845921_1n4zjl.mp3\t2025-11-25 15:00:47\t✅ 可生成影片\n90001\t540002\t反直覺創業：先做內容，不寫程式\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540002/highlight_1764082842134_wfekqo.mp3\t2025-11-25 15:00:43\t✅ 可生成影片\n60003\t540001\t總結：想做產品的人必聽的三大啟示\t59\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081253484_dnkwp.mp3\t2025-11-25 14:34:13\t✅ 可生成影片\n60002\t540001\t產品的生命力：為什麼創辦人的真實故事最能打動人心？\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081249900_nqdgf.mp3\t2025-11-25 14:34:11\t✅ 可生成影片\n60001\t540001\t內容先行，產品在後：顛覆傳統App開發的市場驗證法\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/540001/highlight_1764081246125_0dy7y.mp3\t2025-11-25 14:34:07\t✅ 可生成影片\n30003\t510001\t重建信任的藝術：不是道歉，而是持續的「種樹」過程\t42\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078828637_iee07g.mp3\t2025-11-25 13:53:49\t✅ 可生成影片\n30002\t510001\t犯錯後如何避免小坑變大窟窿？關鍵在於「導航局勢」\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078825518_5pxiep.mp3\t2025-11-25 13:53:47\t✅ 可生成影片\n30001\t510001\t職場危機處理黃金法則：飛行員的「三部曲」策略\t60\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/510001/highlight_1764078821653_g7g23a.mp3\t2025-11-25 13:53:43\t✅ 可生成影片\n3\t480007\t從被動救火到主動防火：A-GAS的終極價值\t103\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056367163_gdy8su.mp3\t2025-11-25 07:39:28\t❌ 超過限制\n2\t480007\t危機處理SOP：記住「四個不要」和處理順序\t75\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056362930_240jdt.mp3\t2025-11-25 07:39:25\t❌ 超過限制\n1\t480007\t錯誤分級：不是所有錯誤都一樣嚴重\t92\thttps://d2xsxph8kpxj0f.cloudfront.net/310519663182587025/kf362K9uEYqJammqLrrUaT/podcast-highlights/1/480007/highlight_1764056359781_3lvj1.mp3\t2025-11-25 07:39:21\t❌ 超過限制\n",
+  "stderr": "",
+  "execution_time_ms": 1534
+}

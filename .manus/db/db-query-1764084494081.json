@@ -1,0 +1,9 @@
+{
+  "query": "SELECT \n  id,\n  task_id,\n  title,\n  duration,\n  CASE \n    WHEN audio_url IS NOT NULL AND audio_url != '' THEN '✅ 有音檔'\n    ELSE '❌ 無音檔'\n  END as audio_status,\n  created_at\nFROM podcast_highlights\nORDER BY created_at DESC\nLIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT \n  id,\n  task_id,\n  title,\n  duration,\n  CASE \n    WHEN audio_url IS NOT NULL AND audio_url != '' THEN '✅ 有音檔'\n    ELSE '❌ 無音檔'\n  END as audio_status,\n  created_at\nFROM podcast_highlights\nORDER BY created_at DESC\nLIMIT 5;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1598
+}

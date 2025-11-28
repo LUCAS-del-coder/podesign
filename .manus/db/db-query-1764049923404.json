@@ -1,0 +1,17 @@
+{
+  "query": "SELECT id, status, podcast_audio_url IS NOT NULL as has_audio, podcast_scripts IS NOT NULL as has_scripts, LENGTH(podcast_scripts) as scripts_length FROM podcast_tasks WHERE user_id = 1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user LtHxqrZriiUHME1.0a62a726ab17 --database kf362K9uEYqJammqLrrUaT --execute SELECT id, status, podcast_audio_url IS NOT NULL as has_audio, podcast_scripts IS NOT NULL as has_scripts, LENGTH(podcast_scripts) as scripts_length FROM podcast_tasks WHERE user_id = 1 AND status = 'completed' ORDER BY created_at DESC LIMIT 1;",
+  "rows": [
+    {
+      "id": "390004",
+      "status": "completed",
+      "has_audio": "0",
+      "has_scripts": "0",
+      "scripts_length": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tstatus\thas_audio\thas_scripts\tscripts_length\n390004\tcompleted\t0\t0\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 1620
+}
