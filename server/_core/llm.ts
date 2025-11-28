@@ -314,9 +314,17 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     },
   };
 
-  // Handle JSON response format
+  // Note: gemini-pro doesn't support responseMimeType in generationConfig
+  // We'll request JSON format in the prompt instead
   if (normalizedResponseFormat?.type === "json_object") {
-    payload.generationConfig.responseMimeType = "application/json";
+    // Add instruction to return JSON in the last user message
+    const lastMessage = geminiMessages[geminiMessages.length - 1];
+    if (lastMessage && lastMessage.role === "user" && lastMessage.parts) {
+      const lastPart = lastMessage.parts[lastMessage.parts.length - 1];
+      if (lastPart && "text" in lastPart) {
+        lastPart.text = `${lastPart.text}\n\n請以 JSON 格式回應。`;
+      }
+    }
   }
 
   // Use v1 API with correct model name

@@ -455,14 +455,14 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
       parts: [
         { text: systemPrompt },
         { 
-          text: `請分析這個 YouTube 影片並生成繁體中文 Podcast 內容。影片網址：${youtubeUrl}\n\n請直接觀看影片內容並生成 JSON 格式的回應。`
+          text: `請分析這個 YouTube 影片並生成繁體中文 Podcast 內容。影片網址：${youtubeUrl}\n\n請直接觀看影片內容並以 JSON 格式回應。`
         }
       ]
     }],
     generationConfig: {
       temperature: 0.7,
       maxOutputTokens: 4096,
-      responseMimeType: "application/json",
+      // Note: gemini-pro doesn't support responseMimeType, request JSON in prompt instead
     },
   };
 
