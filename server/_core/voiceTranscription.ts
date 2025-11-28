@@ -70,13 +70,17 @@ export type TranscriptionError = {
  * @param options - Audio data and metadata
  * @returns Transcription result or error
  */
-// Initialize OpenAI client
+// Initialize OpenAI client with timeout and retry configuration
 const getOpenAIClient = (): OpenAI => {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not set");
   }
-  return new OpenAI({ apiKey });
+  return new OpenAI({ 
+    apiKey,
+    timeout: 300000, // 5 minutes timeout for large audio files
+    maxRetries: 3, // Retry up to 3 times
+  });
 };
 
 export async function transcribeAudio(
@@ -145,47 +149,98 @@ export async function transcribeAudio(
     const filename = `audio.${getFileExtension(mimeType)}`;
     const audioFile = new File([audioBuffer], filename, { type: mimeType });
 
-    // Step 4: Call OpenAI Whisper API
+    // Step 4: Call OpenAI Whisper API with retry logic
     console.log(`[Whisper] Calling OpenAI Whisper API...`);
     const openai = getOpenAIClient();
     let transcription;
-    try {
-      transcription = await openai.audio.transcriptions.create({
-        file: audioFile,
-        model: "whisper-1",
-        response_format: "verbose_json",
-        language: options.language || undefined,
-        prompt: options.prompt || undefined,
-      });
-      
-      console.log(`[Whisper] Transcription successful, language: ${transcription.language}, duration: ${transcription.duration}s`);
-    } catch (apiError) {
-      console.error(`[Whisper] OpenAI API error:`, apiError);
-      if (apiError instanceof Error) {
-        if (apiError.message.includes("API key") || apiError.message.includes("authentication")) {
+    
+    // Retry configuration
+    const maxRetries = 3;
+    let lastError: any = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[Whisper] Attempt ${attempt}/${maxRetries}...`);
+        transcription = await openai.audio.transcriptions.create({
+          file: audioFile,
+          model: "whisper-1",
+          response_format: "verbose_json",
+          language: options.language || undefined,
+          prompt: options.prompt || undefined,
+        });
+        
+        console.log(`[Whisper] Transcription successful, language: ${transcription.language}, duration: ${transcription.duration}s`);
+        break; // Success, exit retry loop
+      } catch (apiError: any) {
+        lastError = apiError;
+        console.error(`[Whisper] Attempt ${attempt} failed:`, apiError?.message || apiError);
+        
+        // Check if it's a retryable error
+        const isRetryable = 
+          apiError?.code === 'ECONNRESET' ||
+          apiError?.code === 'ETIMEDOUT' ||
+          apiError?.code === 'ENOTFOUND' ||
+          apiError?.message?.includes('Connection error') ||
+          apiError?.message?.includes('timeout') ||
+          apiError?.type === 'system';
+        
+        // Don't retry on authentication or rate limit errors
+        if (apiError?.message?.includes("API key") || 
+            apiError?.message?.includes("authentication") ||
+            apiError?.message?.includes("rate limit")) {
+          break; // Exit retry loop for non-retryable errors
+        }
+        
+        // If this is the last attempt or not retryable, throw error
+        if (attempt === maxRetries || !isRetryable) {
+          break;
+        }
+        
+        // Wait before retrying (exponential backoff)
+        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Max 10 seconds
+        console.log(`[Whisper] Retrying in ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+    
+    // If transcription is still undefined, handle the error
+    if (!transcription) {
+      console.error(`[Whisper] All ${maxRetries} attempts failed`);
+      if (lastError instanceof Error) {
+        if (lastError.message.includes("API key") || lastError.message.includes("authentication")) {
           return {
             error: "OpenAI API authentication failed",
             code: "SERVICE_ERROR",
-            details: `Please check OPENAI_API_KEY: ${apiError.message}`
+            details: `Please check OPENAI_API_KEY: ${lastError.message}`
           };
         }
-        if (apiError.message.includes("rate limit")) {
+        if (lastError.message.includes("rate limit")) {
           return {
             error: "OpenAI API rate limit exceeded",
             code: "SERVICE_ERROR",
             details: "Please try again later"
           };
         }
+        // Check for connection errors
+        if (lastError.code === 'ECONNRESET' || 
+            lastError.message?.includes('Connection error') ||
+            lastError.type === 'system') {
+          return {
+            error: "OpenAI API connection failed",
+            code: "SERVICE_ERROR",
+            details: `Network error after ${maxRetries} attempts. Please check your internet connection and try again. Error: ${lastError.message}`
+          };
+        }
         return {
           error: "OpenAI API call failed",
           code: "SERVICE_ERROR",
-          details: apiError.message
+          details: lastError.message
         };
       }
       return {
         error: "OpenAI API call failed",
         code: "SERVICE_ERROR",
-        details: "Unknown error occurred"
+        details: "Unknown error occurred after multiple retries"
       };
     }
 
