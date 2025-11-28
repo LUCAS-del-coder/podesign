@@ -5,6 +5,9 @@
 
 import { ENV } from "./env";
 
+// 注意：這裡需要檢查 ENV 中是否有 googleClientId 和 googleClientSecret
+// 但 ENV 中沒有這些欄位，需要先添加到 env.ts
+
 export interface ValidationResult {
   valid: boolean;
   missing: string[];
@@ -51,8 +54,8 @@ export function validateEnvironmentVariables(): ValidationResult {
   }
 
   // 檢查 OAuth 配置（可選，但建議配置）
-  if (!ENV.googleClientId || !ENV.googleClientSecret) {
-    warnings.push("未配置 Google OAuth（GOOGLE_CLIENT_ID 和 GOOGLE_CLIENT_SECRET）。Google 登入功能將無法使用。");
+  if (!ENV.googleClientId || !ENV.googleClientSecret || !ENV.googleRedirectUri) {
+    warnings.push("未配置 Google OAuth（GOOGLE_CLIENT_ID、GOOGLE_CLIENT_SECRET 或 GOOGLE_REDIRECT_URI）。Google 登入功能將無法使用。");
   }
 
   return {

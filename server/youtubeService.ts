@@ -8,6 +8,7 @@ import { transcribeAudio } from "./_core/voiceTranscription";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { AppError, ErrorCode, normalizeError, logError } from "./_core/errorHandler";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
@@ -60,7 +61,11 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
 }> {
   const videoId = extractVideoId(youtubeUrl);
   if (!videoId) {
-    throw new Error("無效的 YouTube URL");
+    throw new AppError(
+      ErrorCode.INVALID_INPUT,
+      "無效的 YouTube URL",
+      { url: youtubeUrl }
+    );
   }
 
   // 建立臨時目錄
@@ -433,7 +438,10 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
   const { ENV } = await import("./_core/env");
   
   if (!ENV.googleGeminiApiKey) {
-    throw new Error("GOOGLE_GEMINI_API_KEY is not configured");
+    throw new AppError(
+      ErrorCode.API_KEY_MISSING,
+      "GOOGLE_GEMINI_API_KEY is not configured"
+    );
   }
 
   const systemPrompt = `你是專業的 Podcast 編輯。分析 YouTube 影片並生成繁體中文 Podcast 內容。
@@ -546,7 +554,11 @@ export async function processYoutubeToPodcast(youtubeUrl: string): Promise<{
 }> {
   // 驗證 URL
   if (!isValidYoutubeUrl(youtubeUrl)) {
-    throw new Error("無效的 YouTube 網址");
+    throw new AppError(
+      ErrorCode.INVALID_INPUT,
+      "無效的 YouTube 網址",
+      { url: youtubeUrl }
+    );
   }
 
   console.log(`[YouTube] 開始處理: ${youtubeUrl}`);

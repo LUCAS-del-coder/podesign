@@ -25,4 +25,12 @@ export const ENV = {
   backblazePublicUrl: process.env.BACKBLAZE_PUBLIC_URL ?? "", // Optional: custom public URL
   // Google Gemini API for LLM (content analysis)
   googleGeminiApiKey: process.env.GOOGLE_GEMINI_API_KEY ?? "",
+  // Google OAuth (optional, for Google login)
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI ?? "",
+  // Manus Forge API (legacy, optional)
+  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
+  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
 };

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createPodcastTask, updatePodcastTask, getUserPodcastTasks, getPodcastTask } from "./db";
 import { isValidYoutubeUrl, processYoutubeToPodcast } from "./youtubeService";
 import { generateChinesePodcast } from "./listenHubService";
+import { AppError, ErrorCode, normalizeError, logError, getUserFriendlyMessage } from "./_core/errorHandler";
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -674,17 +675,22 @@ async function processPodcastTask(
       podcastScripts: podcastEpisode.scripts ? JSON.stringify(podcastEpisode.scripts) : null,
     });
   } catch (error) {
-    console.error(`Task ${taskId} failed:`, error);
+    // 使用統一的錯誤處理
+    const appError = normalizeError(error);
+    logError(appError, { taskId, inputType, mode });
+    
     const { updateProgress } = await import('./services/progressService');
+    const userMessage = getUserFriendlyMessage(appError);
+    
     await updateProgress({
       taskId,
       stage: 'failed',
       percent: 0,
-      message: error instanceof Error ? error.message : '處理失敗',
+      message: userMessage,
     });
     await updatePodcastTask(taskId, {
       status: 'failed',
-      errorMessage: error instanceof Error ? error.message : '處理失敗',
+      errorMessage: userMessage,
     });
   }
 }
