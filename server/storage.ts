@@ -1,10 +1,33 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
+// Storage helpers supporting both AWS S3 and Manus Forge API
+// Automatically uses AWS S3 if configured, otherwise falls back to Manus Forge API
 
 import { ENV } from './_core/env';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 type StorageConfig = { baseUrl: string; apiKey: string };
 
+// Check if AWS S3 is configured
+function isS3Configured(): boolean {
+  return !!(ENV.awsAccessKeyId && ENV.awsSecretAccessKey && ENV.awsRegion && ENV.awsS3Bucket);
+}
+
+// Get AWS S3 client
+function getS3Client(): S3Client {
+  if (!isS3Configured()) {
+    throw new Error('AWS S3 is not configured');
+  }
+  
+  return new S3Client({
+    region: ENV.awsRegion,
+    credentials: {
+      accessKeyId: ENV.awsAccessKeyId!,
+      secretAccessKey: ENV.awsSecretAccessKey!,
+    },
+  });
+}
+
+// Get Manus Forge API config (legacy support)
 function getStorageConfig(): StorageConfig {
   const baseUrl = ENV.forgeApiUrl;
   const apiKey = ENV.forgeApiKey;
@@ -72,31 +95,79 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
-  const uploadUrl = buildUploadUrl(baseUrl, key);
-  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: buildAuthHeaders(apiKey),
-    body: formData,
-  });
+  
+  // Use AWS S3 if configured, otherwise use Manus Forge API
+  if (isS3Configured()) {
+    try {
+      const s3Client = getS3Client();
+      const buffer = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
+      
+      const command = new PutObjectCommand({
+        Bucket: ENV.awsS3Bucket!,
+        Key: key,
+        Body: buffer,
+        ContentType: contentType,
+      });
+      
+      await s3Client.send(command);
+      
+      // Generate public URL or signed URL
+      const url = ENV.awsS3PublicUrl 
+        ? `${ENV.awsS3PublicUrl}/${key}`
+        : `https://${ENV.awsS3Bucket}.s3.${ENV.awsRegion}.amazonaws.com/${key}`;
+      
+      return { key, url };
+    } catch (error) {
+      throw new Error(`AWS S3 upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  } else {
+    // Fallback to Manus Forge API
+    const { baseUrl, apiKey } = getStorageConfig();
+    const uploadUrl = buildUploadUrl(baseUrl, key);
+    const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: buildAuthHeaders(apiKey),
+      body: formData,
+    });
 
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
+    if (!response.ok) {
+      const message = await response.text().catch(() => response.statusText);
+      throw new Error(
+        `Storage upload failed (${response.status} ${response.statusText}): ${message}`
+      );
+    }
+    const url = (await response.json()).url;
+    return { key, url };
   }
-  const url = (await response.json()).url;
-  return { key, url };
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
-  const { baseUrl, apiKey } = getStorageConfig();
   const key = normalizeKey(relKey);
-  return {
-    key,
-    url: await buildDownloadUrl(baseUrl, key, apiKey),
-  };
+  
+  // Use AWS S3 if configured, otherwise use Manus Forge API
+  if (isS3Configured()) {
+    try {
+      const s3Client = getS3Client();
+      const command = new GetObjectCommand({
+        Bucket: ENV.awsS3Bucket!,
+        Key: key,
+      });
+      
+      // Generate signed URL (valid for 1 hour)
+      const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      
+      return { key, url };
+    } catch (error) {
+      throw new Error(`AWS S3 get failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  } else {
+    // Fallback to Manus Forge API
+    const { baseUrl, apiKey } = getStorageConfig();
+    return {
+      key,
+      url: await buildDownloadUrl(baseUrl, key, apiKey),
+    };
+  }
 }
