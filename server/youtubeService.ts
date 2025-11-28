@@ -417,13 +417,86 @@ ${truncatedTranscription}`;
 }
 
 /**
+ * 使用 Gemini 直接分析 YouTube URL（快速方式，跳過下載和轉錄）
+ */
+async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
+  transcription: string;
+  summary: string;
+  podcastScript: string;
+  language: string;
+  title?: string;
+}> {
+  console.log(`[YouTube] 使用 Gemini 直接分析 YouTube URL: ${youtubeUrl}`);
+  
+  const systemPrompt = `你是專業的 Podcast 編輯。分析 YouTube 影片並生成繁體中文 Podcast 內容。
+
+輸出 JSON 格式：
+{
+  "title": "影片標題",
+  "transcription": "主要內容的文字摘要（500-1000字）",
+  "summary": "200-300字精華摘要",
+  "podcastScript": "第三人稱 Podcast 腳本（含 intro、主要內容、outro）"
+}`;
+
+  const userPrompt = `請分析這個 YouTube 影片並生成繁體中文 Podcast 內容：
+
+${youtubeUrl}
+
+請直接觀看影片內容（如果可能），或根據影片標題和描述生成內容。`;
+
+  const response = await invokeLLM({
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    response_format: {
+      type: "json_object",
+    },
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("LLM 未返回內容");
+  }
+
+  const contentStr = typeof content === "string" ? content : JSON.stringify(content);
+  
+  let result;
+  try {
+    result = JSON.parse(contentStr);
+  } catch (parseError) {
+    const jsonMatch = contentStr.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      result = JSON.parse(jsonMatch[0]);
+    } else {
+      throw new Error("無法解析 LLM 回應為 JSON");
+    }
+  }
+
+  // 驗證結果格式
+  if (!result.summary || !result.podcastScript) {
+    throw new Error("LLM 回應格式不正確，缺少必要欄位");
+  }
+
+  return {
+    transcription: result.transcription || result.summary || "（由 AI 分析生成）",
+    summary: result.summary,
+    podcastScript: result.podcastScript,
+    language: "zh",
+    title: result.title,
+  };
+}
+
+/**
  * 完整的 YouTube 轉 Podcast 處理流程
+ * 優先使用 Gemini 直接分析（快速），如果失敗則回退到傳統方式
  */
 export async function processYoutubeToPodcast(youtubeUrl: string): Promise<{
   transcription: string;
   summary: string;
   podcastScript: string;
   language: string;
+  duration: number;
   audioUrl: string;
   audioFileKey: string;
   title?: string;
@@ -433,23 +506,49 @@ export async function processYoutubeToPodcast(youtubeUrl: string): Promise<{
     throw new Error("無效的 YouTube 網址");
   }
 
-  // 步驟 1: 下載並轉錄影片
   console.log(`[YouTube] 開始處理: ${youtubeUrl}`);
-  const transcriptionResult = await transcribeYoutubeVideo(youtubeUrl);
-  console.log(`[YouTube] 轉錄完成，文字長度: ${transcriptionResult.text.length} 字元`);
 
-  // 步驟 2: 分析內容並產生摘要與腳本（優化：使用較短的提示詞）
-  console.log(`[YouTube] 開始分析內容...`);
-  const analysisResult = await analyzePodcastContent(transcriptionResult.text);
-  console.log(`[YouTube] 內容分析完成`);
+  // 優先嘗試：使用 Gemini 直接分析（快速方式）
+  try {
+    console.log(`[YouTube] 嘗試使用 Gemini 直接分析...`);
+    const directResult = await analyzeYoutubeUrlDirectly(youtubeUrl);
+    
+    // 生成假的 audioUrl 和 fileKey（因為沒有實際下載）
+    const videoId = extractVideoId(youtubeUrl) || "unknown";
+    const fakeFileKey = `podcast-audio/${videoId}-gemini-direct.mp3`;
+    
+    console.log(`[YouTube] Gemini 直接分析成功！`);
+    
+    return {
+      transcription: directResult.transcription,
+      summary: directResult.summary,
+      podcastScript: directResult.podcastScript,
+      language: directResult.language,
+      duration: 0, // 無法獲取實際時長
+      audioUrl: "", // 沒有實際音檔
+      audioFileKey: fakeFileKey,
+      title: directResult.title,
+    };
+  } catch (error) {
+    console.warn(`[YouTube] Gemini 直接分析失敗，回退到傳統方式:`, error);
+    
+    // 回退到傳統方式：下載並轉錄
+    console.log(`[YouTube] 使用傳統方式：下載並轉錄...`);
+    const transcriptionResult = await transcribeYoutubeVideo(youtubeUrl);
+    console.log(`[YouTube] 轉錄完成，文字長度: ${transcriptionResult.text.length} 字元`);
 
-  return {
-    transcription: transcriptionResult.text,
-    summary: analysisResult.summary,
-    podcastScript: analysisResult.podcastScript,
-    language: transcriptionResult.language,
-    audioUrl: transcriptionResult.audioUrl,
-    audioFileKey: transcriptionResult.audioFileKey,
-    title: transcriptionResult.title,
-  };
+    console.log(`[YouTube] 開始分析內容...`);
+    const analysisResult = await analyzePodcastContent(transcriptionResult.text);
+    console.log(`[YouTube] 內容分析完成`);
+
+    return {
+      transcription: transcriptionResult.text,
+      summary: analysisResult.summary,
+      podcastScript: analysisResult.podcastScript,
+      language: transcriptionResult.language,
+      audioUrl: transcriptionResult.audioUrl,
+      audioFileKey: transcriptionResult.audioFileKey,
+      title: transcriptionResult.title,
+    };
+  }
 }
