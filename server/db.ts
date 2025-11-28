@@ -7,11 +7,21 @@ let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!process.env.DATABASE_URL) {
+    console.error("[Database] DATABASE_URL environment variable is not set!");
+    return null;
+  }
+
+  if (!_db) {
     try {
+      console.log("[Database] Connecting to database...");
       _db = drizzle(process.env.DATABASE_URL);
+      // 測試連接
+      await _db.execute("SELECT 1");
+      console.log("[Database] Database connection successful");
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      console.error("[Database] Failed to connect:", error);
+      console.error("[Database] DATABASE_URL format:", process.env.DATABASE_URL ? "Set (hidden)" : "Not set");
       _db = null;
     }
   }
