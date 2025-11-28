@@ -343,35 +343,37 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   // Use official SDK instead of direct REST API calls
   const client = getGeminiClient();
   
-  // Try models in order of preference (based on successful cases)
+  // Note: Gemini 1.5 series was deprecated in September 2025
+  // Use Gemini 2.x or 3.x series models
   const modelNames = [
-    "gemini-1.5-pro-latest",
+    "gemini-2.0-flash-exp", // Experimental, latest
     "gemini-2.0-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-pro",
-    "gemini-1.5-flash",
+    "gemini-1.5-pro-latest", // Fallback (may still work)
   ];
   
   let lastError: Error | null = null;
   let usedModel = "";
-  let result: any = null;
+  let result: InvokeResult | null = null;
   
   for (const modelName of modelNames) {
     try {
       console.log(`[LLM] Trying model: ${modelName}`);
-      const model = client.getGenerativeModel({ model: modelName });
-      
-      // Convert Gemini format messages to SDK format
-      const chat = model.startChat({
-        history: geminiMessages.slice(0, -1).map(msg => ({
-          role: msg.role === "model" ? "model" : "user",
-          parts: msg.parts,
-        })),
+      const model = client.getGenerativeModel({ 
+        model: modelName,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 4096,
+        },
       });
       
-      const lastMsg = geminiMessages[geminiMessages.length - 1];
-      const response = await chat.sendMessage(lastMsg.parts.map(p => p.text).join(" "));
+      // Use generateContent instead of chat for simpler API
+      // Combine all messages into a single prompt
+      const prompt = geminiMessages.map(msg => {
+        const text = msg.parts.map(p => p.text).join(" ");
+        return msg.role === "model" ? `Assistant: ${text}` : `User: ${text}`;
+      }).join("\n\n");
       
+      const response = await model.generateContent(prompt);
       const responseText = response.response.text();
       
       if (!responseText) {
@@ -407,7 +409,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
       lastError = error instanceof Error ? error : new Error(String(error));
       
       // If it's a 404 or model not found error, try next model
-      if (error.message?.includes("404") || error.message?.includes("not found") || error.message?.includes("NOT_FOUND")) {
+      if (error.message?.includes("404") || 
+          error.message?.includes("not found") || 
+          error.message?.includes("NOT_FOUND") ||
+          error.message?.includes("404")) {
         continue;
       }
       
