@@ -563,26 +563,29 @@ Video ID: ${videoId}
         throw new Error("Gemini 未返回內容");
       }
 
-      // 解析 JSON 回應（清理控制字符）
+      // 解析 JSON 回應（清理 markdown 代碼塊和控制字符）
       let result;
       try {
-        // 清理控制字符（換行符、製表符等，但保留 JSON 結構）
-        const cleanedText = responseText
-          .replace(/[\x00-\x1F\x7F-\x9F]/g, '') // 移除控制字符
-          .replace(/\n/g, ' ') // 將換行符替換為空格
-          .replace(/\r/g, '') // 移除回車符
+        // 1. 移除 markdown 代碼塊標記（```json ... ``` 或 ``` ... ```）
+        let cleanedText = responseText.replace(/^```(?:json)?\s*\n?/gm, '').replace(/\n?```\s*$/gm, '');
+        
+        // 2. 清理控制字符（但保留換行符，因為 JSON 可能跨多行）
+        cleanedText = cleanedText
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // 移除壞的控制字符
           .trim();
         
         result = JSON.parse(cleanedText);
       } catch (parseError) {
         // 如果解析失敗，嘗試提取 JSON 部分
         try {
-          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          // 先移除 markdown 代碼塊
+          let cleanedResponse = responseText.replace(/^```(?:json)?\s*\n?/gm, '').replace(/\n?```\s*$/gm, '');
+          
+          // 提取 JSON 對象
+          const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const cleanedJson = jsonMatch[0]
-              .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
-              .replace(/\n/g, ' ')
-              .replace(/\r/g, '')
+              .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '')
               .trim();
             result = JSON.parse(cleanedJson);
           } else {
@@ -590,17 +593,27 @@ Video ID: ${videoId}
           }
         } catch (extractError) {
           console.warn(`[YouTube] JSON 解析失敗，嘗試手動提取欄位:`, parseError);
-          // 最後嘗試：手動提取關鍵欄位
-          const titleMatch = responseText.match(/"title"\s*:\s*"([^"]+)"/);
-          const summaryMatch = responseText.match(/"summary"\s*:\s*"([^"]+)"/);
-          const scriptMatch = responseText.match(/"podcastScript"\s*:\s*"([^"]+)"/);
+          // 最後嘗試：手動提取關鍵欄位（處理多行字符串值）
+          const videoIdMatch = responseText.match(/"videoId"\s*:\s*"([^"]+)"/);
+          const titleMatch = responseText.match(/"title"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
+          const summaryMatch = responseText.match(/"summary"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
+          const scriptMatch = responseText.match(/"podcastScript"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
           
           if (summaryMatch && scriptMatch) {
+            // 解碼轉義字符
+            const decodeString = (str: string) => {
+              return str
+                .replace(/\\n/g, '\n')
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, '\\');
+            };
+            
             result = {
-              title: titleMatch ? titleMatch[1] : undefined,
-              transcription: summaryMatch[1],
-              summary: summaryMatch[1],
-              podcastScript: scriptMatch[1],
+              videoId: videoIdMatch ? videoIdMatch[1] : undefined,
+              title: titleMatch ? decodeString(titleMatch[1]) : undefined,
+              transcription: summaryMatch ? decodeString(summaryMatch[1]) : undefined,
+              summary: decodeString(summaryMatch[1]),
+              podcastScript: decodeString(scriptMatch[1]),
             };
           } else {
             throw new Error(`無法解析 Gemini 回應為 JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
