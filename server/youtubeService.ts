@@ -1,10 +1,10 @@
 /**
  * YouTube 影片處理服務
- * 使用純 JavaScript 方案（@distube/ytdl-core）下載 YouTube 音訊
+ * 使用 youtube-dl-exec（yt-dlp 的 Node.js 包裝器）下載 YouTube 音訊
  * 並使用內建的 transcribeAudio API 進行轉錄
  */
 
-import ytdl from "@distube/ytdl-core";
+import youtubeDlExec from "youtube-dl-exec";
 import { transcribeAudio } from "./_core/voiceTranscription";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
@@ -12,15 +12,25 @@ import fs from "fs/promises";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
-import { pipeline } from "stream/promises";
-import { createWriteStream } from "fs";
 
 /**
  * 從 YouTube URL 提取影片 ID
  */
 export function extractVideoId(url: string): string | null {
   try {
-    return ytdl.getVideoID(url);
+    // 支援多種 YouTube URL 格式
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
+    ];
+    
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    return null;
   } catch (error) {
     return null;
   }
@@ -30,7 +40,8 @@ export function extractVideoId(url: string): string | null {
  * 驗證 YouTube URL 是否有效
  */
 export function isValidYoutubeUrl(url: string): boolean {
-  return ytdl.validateURL(url);
+  const videoId = extractVideoId(url);
+  return videoId !== null && videoId.length === 11;
 }
 
 /**
@@ -55,148 +66,138 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
   try {
     console.log(`[YouTube] 開始下載音訊: ${youtubeUrl}`);
 
-    // 獲取影片資訊 - 添加重試機制
-    let videoInfo;
-    let retryCount = 0;
-    const maxRetries = 3;
-    
-    while (retryCount < maxRetries) {
-      try {
-        videoInfo = await ytdl.getInfo(youtubeUrl, {
-          requestOptions: {
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-          },
-        });
-        console.log(`[YouTube] 影片標題: ${videoInfo.videoDetails.title}`);
-        console.log(`[YouTube] 影片長度: ${videoInfo.videoDetails.lengthSeconds} 秒`);
-        break; // 成功，跳出重試循環
-      } catch (error: any) {
-        retryCount++;
-        console.error(`[YouTube] 獲取影片資訊失敗 (嘗試 ${retryCount}/${maxRetries}):`, error.message);
-        
-        if (retryCount >= maxRetries) {
-          // 提供友善的錯誤訊息
-          let errorMessage = '無法獲取 YouTube 影片資訊';
-          if (error.message?.includes('private')) {
-            errorMessage = '此影片為私人影片，無法下載';
-          } else if (error.message?.includes('unavailable')) {
-            errorMessage = '影片不存在或不可用';
-          } else if (error.message?.includes('age')) {
-            errorMessage = '此影片有年齡限制，無法下載';
-          } else if (error.message?.includes('region')) {
-            errorMessage = '影片在您的國家/地區不可用';
-          } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
-            errorMessage = 'YouTube 暫時限制存取，請稍後重試';
-          }
-          throw new Error(errorMessage);
-        }
-        
-        // 等待後重試
-        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-      }
-    }
-
-    // 選擇最佳音訊格式（優先選擇 opus 或 mp4）
-    const audioFormats = ytdl.filterFormats(videoInfo.formats, 'audioonly');
-    if (audioFormats.length === 0) {
-      throw new Error('找不到可用的音訊格式');
-    }
-
-    // 選擇最低品質的音訊格式以減小檔案大小
-    const format = audioFormats.sort((a, b) => {
-      const aBitrate = typeof a.bitrate === 'string' ? parseInt(a.bitrate) : (a.bitrate || 0);
-      const bBitrate = typeof b.bitrate === 'string' ? parseInt(b.bitrate) : (b.bitrate || 0);
-      return aBitrate - bBitrate;
-    })[0];
-
-    console.log(`[YouTube] 使用音訊格式: ${format.mimeType}, 位元率: ${format.bitrate}`);
-
-    // 下載音訊 - 使用更寬鬆的選項以提高成功率
-    let audioStream;
+    // 使用 youtube-dl-exec (yt-dlp) 下載音訊
+    // 這會自動下載 yt-dlp 二進位檔（如果還沒有）
     try {
-      audioStream = ytdl(youtubeUrl, {
-        quality: 'lowestaudio', // 使用最低品質以提高成功率
-        filter: 'audioonly',
-        requestOptions: {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          },
-        },
-      });
-    } catch (error: any) {
-      console.error(`[YouTube] 建立下載串流失敗:`, error);
-      throw new Error('無法建立下載連線，請稍後重試');
-    }
-
-    const writeStream = createWriteStream(outputPath);
-    
-    // 使用 pipeline 處理串流，並處理錯誤
-    try {
-      // 設定超時（10 分鐘）
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('下載超時')), 10 * 60 * 1000);
-      });
-
-      await Promise.race([
-        pipeline(audioStream, writeStream),
-        timeoutPromise,
-      ]);
-    } catch (error: any) {
-      console.error(`[YouTube] 下載失敗:`, error);
-      let errorMessage = 'YouTube 影片下載失敗';
+      console.log(`[YouTube] 使用 yt-dlp 下載音訊...`);
       
-      if (error.message?.includes('timeout') || error.message === '下載超時') {
-        errorMessage = '下載超時。影片可能過長或網路連線不穩定，請稍後重試';
-      } else if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
-        errorMessage = '無法下載影片。YouTube 可能已更新其保護機制，請稍後重試';
-      } else if (error.message?.includes('Sign in to confirm your age')) {
-        errorMessage = '此影片有年齡限制，無法下載';
-      } else if (error.message?.includes('Video unavailable')) {
-        errorMessage = '影片不存在或不可用';
-      } else if (error.message?.includes('Private video')) {
+      // 先獲取影片資訊
+      const videoInfo: any = await youtubeDlExec(youtubeUrl, {
+        dumpJson: true,
+        noWarnings: true,
+        noCallHome: true,
+        noCheckCertificate: true,
+        preferFreeFormats: true,
+        addHeader: [
+          'referer:https://www.youtube.com/',
+          'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        ],
+      });
+
+      const title = (videoInfo && typeof videoInfo === 'object' && videoInfo.title) ? videoInfo.title : 'Unknown';
+      const duration = (videoInfo && typeof videoInfo === 'object' && videoInfo.duration) ? videoInfo.duration : 0;
+      console.log(`[YouTube] 影片標題: ${title}`);
+      console.log(`[YouTube] 影片長度: ${duration} 秒`);
+
+      // 下載音訊（使用 yt-dlp 的最佳音訊格式）
+      console.log(`[YouTube] 開始下載音訊...`);
+      const outputTemplate = path.join(tempDir, `${videoId}.%(ext)s`);
+      
+      await youtubeDlExec(youtubeUrl, {
+        format: 'bestaudio[ext=m4a]/bestaudio/best', // 優先選擇 m4a，然後其他音訊格式
+        output: outputTemplate,
+        noWarnings: true,
+        noCallHome: true,
+        noCheckCertificate: true,
+        preferFreeFormats: true,
+        addHeader: [
+          'referer:https://www.youtube.com/',
+          'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        ],
+      });
+
+      // 查找下載的檔案（可能是 .m4a, .webm, .opus 等）
+      const files = await fs.readdir(tempDir);
+      const audioFile = files.find(f => 
+        f.startsWith(videoId) && 
+        (f.endsWith('.m4a') || f.endsWith('.webm') || f.endsWith('.opus') || f.endsWith('.mp3'))
+      );
+      
+      if (!audioFile) {
+        throw new Error('下載完成但找不到音訊檔案');
+      }
+
+      const downloadedPath = path.join(tempDir, audioFile);
+      
+      // 如果不是 MP3，需要轉換（但為了簡化，我們直接使用下載的格式）
+      // 如果下載的是 MP3，直接使用；否則需要轉換
+      let finalPath = outputPath;
+      if (!audioFile.endsWith('.mp3')) {
+        // 如果下載的不是 MP3，嘗試轉換（需要 ffmpeg）
+        console.log(`[YouTube] 轉換音訊格式為 MP3...`);
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
+        const execAsync = promisify(exec);
+        const ffmpegPath = (await import('@ffmpeg-installer/ffmpeg')).default.path;
+        
+        await execAsync(
+          `"${ffmpegPath}" -i "${downloadedPath}" -acodec libmp3lame -b:a 128k "${outputPath}" -y`
+        );
+        // 刪除原始檔案
+        await fs.unlink(downloadedPath);
+      } else {
+        // 已經是 MP3，直接重新命名
+        if (downloadedPath !== outputPath) {
+          await fs.rename(downloadedPath, outputPath);
+        }
+      }
+
+      console.log(`[YouTube] 音訊下載完成: ${outputPath}`);
+
+      // 讀取檔案
+      const audioBuffer = await fs.readFile(outputPath);
+      const sizeMB = audioBuffer.length / (1024 * 1024);
+
+      console.log(`[YouTube] 音訊檔案大小: ${sizeMB.toFixed(2)}MB`);
+
+      // 檢查檔案大小（OpenAI Whisper 限制 25MB，但我們設定 16MB 以確保穩定）
+      if (sizeMB > 16) {
+        throw new Error(
+          `音訊檔案過大 (${sizeMB.toFixed(2)}MB)，超過 16MB 限制。` +
+          `請選擇較短的影片（建議 30 分鐘以內）或使用文字輸入功能。`
+        );
+      }
+
+      if (sizeMB < 0.01) {
+        throw new Error(`音訊檔案過小 (${sizeMB.toFixed(2)}MB)，可能下載失敗`);
+      }
+
+      // 上傳到 S3
+      const randomSuffix = crypto.randomBytes(8).toString("hex");
+      const fileKey = `podcast-audio/${videoId}-${randomSuffix}.mp3`;
+
+      console.log(`[YouTube] 上傳音訊到 S3: ${fileKey}`);
+      const { url: audioUrl } = await storagePut(fileKey, audioBuffer, "audio/mpeg");
+
+      console.log(`[YouTube] 音訊已上傳: ${audioUrl}`);
+
+      return {
+        audioUrl,
+        fileKey,
+        sizeMB,
+        title: title,
+      };
+    } catch (error: any) {
+      console.error(`[YouTube] yt-dlp 下載失敗:`, error);
+      
+      // 提供友善的錯誤訊息
+      let errorMessage = 'YouTube 影片下載失敗';
+      if (error.message?.includes('Private video') || error.stderr?.includes('Private video')) {
         errorMessage = '此影片為私人影片，無法下載';
+      } else if (error.message?.includes('unavailable') || error.stderr?.includes('unavailable')) {
+        errorMessage = '影片不存在或不可用';
+      } else if (error.message?.includes('age') || error.stderr?.includes('age')) {
+        errorMessage = '此影片有年齡限制，無法下載';
+      } else if (error.message?.includes('region') || error.stderr?.includes('region')) {
+        errorMessage = '影片在您的國家/地區不可用';
+      } else if (error.message?.includes('403') || error.stderr?.includes('403')) {
+        errorMessage = 'YouTube 暫時限制存取，請稍後重試';
+      } else if (error.message?.includes('timeout')) {
+        errorMessage = '下載超時。影片可能過長或網路連線不穩定，請稍後重試';
       }
       
       throw new Error(errorMessage);
     }
-
-    console.log(`[YouTube] 音訊下載完成: ${outputPath}`);
-
-    // 讀取檔案
-    const audioBuffer = await fs.readFile(outputPath);
-    const sizeMB = audioBuffer.length / (1024 * 1024);
-
-    console.log(`[YouTube] 音訊檔案大小: ${sizeMB.toFixed(2)}MB`);
-
-    // 檢查檔案大小（轉錄服務限制 16MB）
-    if (sizeMB > 16) {
-      throw new Error(
-        `音訊檔案過大 (${sizeMB.toFixed(2)}MB)，超過 16MB 限制。` +
-        `請選擇較短的影片（建議 30 分鐘以內）或使用文字輸入功能。`
-      );
-    }
-
-    if (sizeMB < 0.01) {
-      throw new Error(`音訊檔案過小 (${sizeMB.toFixed(2)}MB)，可能下載失敗`);
-    }
-
-    // 上傳到 S3
-    const randomSuffix = crypto.randomBytes(8).toString("hex");
-    const fileKey = `podcast-audio/${videoId}-${randomSuffix}.mp3`;
-
-    console.log(`[YouTube] 上傳音訊到 S3: ${fileKey}`);
-    const { url: audioUrl } = await storagePut(fileKey, audioBuffer, "audio/mpeg");
-
-    console.log(`[YouTube] 音訊已上傳: ${audioUrl}`);
-
-    return {
-      audioUrl,
-      fileKey,
-      sizeMB,
-      title: videoInfo.videoDetails.title,
-    };
   } catch (error) {
     console.error(`[YouTube] 處理失敗:`, error);
     // 確保錯誤訊息清晰易懂
