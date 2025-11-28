@@ -28,6 +28,14 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // 診斷環境變數
+  console.log("[Startup] Environment variables check:");
+  console.log("[Startup] DATABASE_URL:", process.env.DATABASE_URL ? "Set (hidden)" : "NOT SET");
+  console.log("[Startup] JWT_SECRET:", process.env.JWT_SECRET ? "Set (hidden)" : "NOT SET");
+  console.log("[Startup] GOOGLE_CLIENT_ID:", process.env.GOOGLE_CLIENT_ID ? "Set (hidden)" : "NOT SET");
+  console.log("[Startup] OPENAI_API_KEY:", process.env.OPENAI_API_KEY ? "Set (hidden)" : "NOT SET");
+  console.log("[Startup] NODE_ENV:", process.env.NODE_ENV);
+
   // 在啟動伺服器前執行資料庫遷移
   const { runMigrations } = await import("./migrate");
   await runMigrations();
