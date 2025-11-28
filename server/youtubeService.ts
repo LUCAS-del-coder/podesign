@@ -541,40 +541,6 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
     console.warn(`[YouTube] Gemini 直接分析失敗，將回退到傳統方式:`, error);
     throw error; // 讓上層函數處理回退
   }
-
-  const geminiResponse = await response.json();
-  const content = geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!content) {
-    throw new Error("Gemini 未返回內容");
-  }
-
-  // 解析 JSON 回應
-  let result;
-  try {
-    result = JSON.parse(content);
-  } catch (parseError) {
-    // 如果解析失敗，嘗試提取 JSON 部分
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      result = JSON.parse(jsonMatch[0]);
-    } else {
-      throw new Error("無法解析 Gemini 回應為 JSON");
-    }
-  }
-
-  // 驗證結果格式
-  if (!result.summary || !result.podcastScript) {
-    throw new Error("Gemini 回應格式不正確，缺少必要欄位");
-  }
-
-  return {
-    transcription: result.transcription || result.summary || "（由 AI 分析生成）",
-    summary: result.summary,
-    podcastScript: result.podcastScript,
-    language: "zh",
-    title: result.title,
-  };
 }
 
 /**

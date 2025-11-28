@@ -416,7 +416,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const result: InvokeResult = {
     id: `gemini-${Date.now()}`,
     created: Math.floor(Date.now() / 1000),
-    model: geminiResponse.model || "gemini-1.5-flash",
+    model: geminiResponse.model || modelName || "gemini-1.5-flash",
     choices: geminiResponse.candidates?.map((candidate: any, index: number) => ({
       index,
       message: {
