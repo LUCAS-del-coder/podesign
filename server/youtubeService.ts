@@ -324,7 +324,9 @@ export async function transcribeYoutubeVideo(youtubeUrl: string): Promise<{
 
     // 檢查是否為錯誤回應
     if ("error" in result) {
-      throw new Error(result.error);
+      const errorDetails = result.details ? `: ${result.details}` : '';
+      console.error(`[YouTube] 轉錄錯誤: ${result.error}${errorDetails}`);
+      throw new Error(`${result.error}${errorDetails}`);
     }
 
     console.log(`[Transcription] 轉錄完成，文字長度: ${result.text.length} 字元`);

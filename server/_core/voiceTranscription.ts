@@ -96,17 +96,31 @@ export async function transcribeAudio(
     let audioBuffer: Buffer;
     let mimeType: string;
     try {
-      const response = await fetch(options.audioUrl);
+      console.log(`[Whisper] Fetching audio from URL: ${options.audioUrl.substring(0, 100)}...`);
+      const response = await fetch(options.audioUrl, {
+        // Add timeout and headers
+        signal: AbortSignal.timeout(60000), // 60 second timeout
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; PodcastMaker/1.0)',
+        },
+      });
+      
       if (!response.ok) {
+        const errorText = await response.text().catch(() => response.statusText);
+        console.error(`[Whisper] Failed to download audio: HTTP ${response.status} ${response.statusText}`);
+        console.error(`[Whisper] Error details: ${errorText.substring(0, 500)}`);
         return {
           error: "Failed to download audio file",
           code: "INVALID_FORMAT",
-          details: `HTTP ${response.status}: ${response.statusText}`
+          details: `HTTP ${response.status}: ${response.statusText}. URL: ${options.audioUrl.substring(0, 100)}...`
         };
       }
       
+      console.log(`[Whisper] Audio download successful, content-type: ${response.headers.get('content-type')}`);
       audioBuffer = Buffer.from(await response.arrayBuffer());
       mimeType = response.headers.get('content-type') || 'audio/mpeg';
+      
+      console.log(`[Whisper] Audio buffer size: ${(audioBuffer.length / (1024 * 1024)).toFixed(2)}MB`);
       
       // Check file size (25MB limit for OpenAI Whisper)
       const sizeMB = audioBuffer.length / (1024 * 1024);
@@ -118,10 +132,12 @@ export async function transcribeAudio(
         };
       }
     } catch (error) {
+      console.error(`[Whisper] Error fetching audio file:`, error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       return {
         error: "Failed to fetch audio file",
         code: "SERVICE_ERROR",
-        details: error instanceof Error ? error.message : "Unknown error"
+        details: `${errorMessage}. URL: ${options.audioUrl.substring(0, 100)}...`
       };
     }
 
@@ -130,14 +146,48 @@ export async function transcribeAudio(
     const audioFile = new File([audioBuffer], filename, { type: mimeType });
 
     // Step 4: Call OpenAI Whisper API
+    console.log(`[Whisper] Calling OpenAI Whisper API...`);
     const openai = getOpenAIClient();
-    const transcription = await openai.audio.transcriptions.create({
-      file: audioFile,
-      model: "whisper-1",
-      response_format: "verbose_json",
-      language: options.language || undefined,
-      prompt: options.prompt || undefined,
-    });
+    let transcription;
+    try {
+      transcription = await openai.audio.transcriptions.create({
+        file: audioFile,
+        model: "whisper-1",
+        response_format: "verbose_json",
+        language: options.language || undefined,
+        prompt: options.prompt || undefined,
+      });
+      
+      console.log(`[Whisper] Transcription successful, language: ${transcription.language}, duration: ${transcription.duration}s`);
+    } catch (apiError) {
+      console.error(`[Whisper] OpenAI API error:`, apiError);
+      if (apiError instanceof Error) {
+        if (apiError.message.includes("API key") || apiError.message.includes("authentication")) {
+          return {
+            error: "OpenAI API authentication failed",
+            code: "SERVICE_ERROR",
+            details: `Please check OPENAI_API_KEY: ${apiError.message}`
+          };
+        }
+        if (apiError.message.includes("rate limit")) {
+          return {
+            error: "OpenAI API rate limit exceeded",
+            code: "SERVICE_ERROR",
+            details: "Please try again later"
+          };
+        }
+        return {
+          error: "OpenAI API call failed",
+          code: "SERVICE_ERROR",
+          details: apiError.message
+        };
+      }
+      return {
+        error: "OpenAI API call failed",
+        code: "SERVICE_ERROR",
+        details: "Unknown error occurred"
+      };
+    }
 
     // Step 5: Convert OpenAI response to our format
     const whisperResponse: WhisperResponse = {
