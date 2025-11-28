@@ -96,14 +96,15 @@ export async function transcribeAudio(
       };
     }
 
-    // Step 2: Download audio from URL
+    // Step 2: Download audio from URL to server
+    // We download to server first because OpenAI may not be able to access signed URLs
     let audioBuffer: Buffer;
     let mimeType: string;
     try {
       console.log(`[Whisper] Fetching audio from URL: ${options.audioUrl.substring(0, 100)}...`);
       const response = await fetch(options.audioUrl, {
         // Add timeout and headers
-        signal: AbortSignal.timeout(60000), // 60 second timeout
+        signal: AbortSignal.timeout(120000), // 120 second timeout for large files
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; PodcastMaker/1.0)',
         },
@@ -146,59 +147,85 @@ export async function transcribeAudio(
     }
 
     // Step 3: Create File object for OpenAI API
+    // Use Blob instead of File for better Node.js compatibility
     const filename = `audio.${getFileExtension(mimeType)}`;
-    const audioFile = new File([audioBuffer], filename, { type: mimeType });
+    const audioBlob = new Blob([audioBuffer], { type: mimeType });
+    const audioFile = new File([audioBlob], filename, { type: mimeType });
 
     // Step 4: Call OpenAI Whisper API with retry logic
-    console.log(`[Whisper] Calling OpenAI Whisper API...`);
+    console.log(`[Whisper] Calling OpenAI Whisper API with file upload (${(audioBuffer.length / (1024 * 1024)).toFixed(2)}MB)...`);
     const openai = getOpenAIClient();
     let transcription;
     
     // Retry configuration
-    const maxRetries = 3;
+    const maxRetries = 5; // Increase to 5 retries for network issues
     let lastError: any = null;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[Whisper] Attempt ${attempt}/${maxRetries}...`);
+        console.log(`[Whisper] Attempt ${attempt}/${maxRetries} (uploading file directly)...`);
+        
+        // Create a fresh File object for each attempt
+        const fileForUpload = new File([audioBlob], filename, { type: mimeType });
+        
         transcription = await openai.audio.transcriptions.create({
-          file: audioFile,
+          file: fileForUpload,
           model: "whisper-1",
           response_format: "verbose_json",
           language: options.language || undefined,
           prompt: options.prompt || undefined,
+        }, {
+          timeout: 300000, // 5 minutes timeout per request
         });
         
         console.log(`[Whisper] Transcription successful, language: ${transcription.language}, duration: ${transcription.duration}s`);
         break; // Success, exit retry loop
       } catch (apiError: any) {
         lastError = apiError;
-        console.error(`[Whisper] Attempt ${attempt} failed:`, apiError?.message || apiError);
+        const errorMsg = apiError?.message || apiError?.toString() || 'Unknown error';
+        const errorCode = apiError?.code || apiError?.type || 'unknown';
+        console.error(`[Whisper] Attempt ${attempt} failed:`, {
+          message: errorMsg,
+          code: errorCode,
+          cause: apiError?.cause?.message,
+        });
         
         // Check if it's a retryable error
         const isRetryable = 
-          apiError?.code === 'ECONNRESET' ||
-          apiError?.code === 'ETIMEDOUT' ||
-          apiError?.code === 'ENOTFOUND' ||
-          apiError?.message?.includes('Connection error') ||
-          apiError?.message?.includes('timeout') ||
-          apiError?.type === 'system';
+          errorCode === 'ECONNRESET' ||
+          errorCode === 'ETIMEDOUT' ||
+          errorCode === 'ENOTFOUND' ||
+          errorCode === 'ECONNREFUSED' ||
+          errorMsg.includes('Connection error') ||
+          errorMsg.includes('timeout') ||
+          errorMsg.includes('ECONNRESET') ||
+          errorMsg.includes('ETIMEDOUT') ||
+          apiError?.type === 'system' ||
+          (apiError?.cause && (
+            apiError.cause.code === 'ECONNRESET' ||
+            apiError.cause.code === 'ETIMEDOUT'
+          ));
         
         // Don't retry on authentication or rate limit errors
-        if (apiError?.message?.includes("API key") || 
-            apiError?.message?.includes("authentication") ||
-            apiError?.message?.includes("rate limit")) {
+        if (errorMsg.includes("API key") || 
+            errorMsg.includes("authentication") ||
+            errorMsg.includes("rate limit") ||
+            errorMsg.includes("401") ||
+            errorMsg.includes("429")) {
+          console.error(`[Whisper] Non-retryable error detected, stopping retries`);
           break; // Exit retry loop for non-retryable errors
         }
         
-        // If this is the last attempt or not retryable, throw error
+        // If this is the last attempt or not retryable, break
         if (attempt === maxRetries || !isRetryable) {
+          console.error(`[Whisper] ${attempt === maxRetries ? 'Max retries reached' : 'Non-retryable error'}, stopping`);
           break;
         }
         
-        // Wait before retrying (exponential backoff)
-        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 10000); // Max 10 seconds
-        console.log(`[Whisper] Retrying in ${waitTime}ms...`);
+        // Wait before retrying (exponential backoff with jitter)
+        const baseWaitTime = 2000; // Start with 2 seconds
+        const waitTime = Math.min(baseWaitTime * Math.pow(2, attempt - 1) + Math.random() * 1000, 15000); // Max 15 seconds
+        console.log(`[Whisper] Retrying in ${Math.round(waitTime)}ms...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
