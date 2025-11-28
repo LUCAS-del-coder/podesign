@@ -16,7 +16,8 @@ COPY package.json pnpm-lock.yaml* ./
 RUN npm install -g pnpm
 
 # 安裝依賴
-RUN pnpm install --frozen-lockfile
+# 使用 --no-frozen-lockfile 以允許在 lockfile 過時時更新
+RUN pnpm install --no-frozen-lockfile
 
 # 複製專案檔案
 COPY . .
