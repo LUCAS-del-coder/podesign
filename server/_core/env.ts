@@ -23,9 +23,6 @@ export const ENV = {
   backblazeRegion: process.env.BACKBLAZE_REGION ?? "us-west-004",
   backblazeEndpoint: process.env.BACKBLAZE_ENDPOINT ?? "", // Optional: custom endpoint
   backblazePublicUrl: process.env.BACKBLAZE_PUBLIC_URL ?? "", // Optional: custom public URL
-  // Storage configuration - Manus Forge API (fallback/legacy, currently not working)
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
-  // OpenAI API for LLM (alternative to Manus Forge API)
-  openaiApiKey: process.env.OPENAI_API_KEY ?? "",
+  // Google Gemini API for LLM (content analysis)
+  googleGeminiApiKey: process.env.GOOGLE_GEMINI_API_KEY ?? "",
 };
