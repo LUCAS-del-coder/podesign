@@ -493,17 +493,48 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         throw new Error("Gemini 未返回內容");
       }
 
-      // 解析 JSON 回應
+      // 解析 JSON 回應（清理控制字符）
       let result;
       try {
-        result = JSON.parse(responseText);
+        // 清理控制字符（換行符、製表符等，但保留 JSON 結構）
+        const cleanedText = responseText
+          .replace(/[\x00-\x1F\x7F-\x9F]/g, '') // 移除控制字符
+          .replace(/\n/g, ' ') // 將換行符替換為空格
+          .replace(/\r/g, '') // 移除回車符
+          .trim();
+        
+        result = JSON.parse(cleanedText);
       } catch (parseError) {
         // 如果解析失敗，嘗試提取 JSON 部分
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          result = JSON.parse(jsonMatch[0]);
-        } else {
-          throw new Error("無法解析 Gemini 回應為 JSON");
+        try {
+          const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const cleanedJson = jsonMatch[0]
+              .replace(/[\x00-\x1F\x7F-\x9F]/g, '')
+              .replace(/\n/g, ' ')
+              .replace(/\r/g, '')
+              .trim();
+            result = JSON.parse(cleanedJson);
+          } else {
+            throw new Error("無法從回應中提取 JSON");
+          }
+        } catch (extractError) {
+          console.warn(`[YouTube] JSON 解析失敗，嘗試手動提取欄位:`, parseError);
+          // 最後嘗試：手動提取關鍵欄位
+          const titleMatch = responseText.match(/"title"\s*:\s*"([^"]+)"/);
+          const summaryMatch = responseText.match(/"summary"\s*:\s*"([^"]+)"/);
+          const scriptMatch = responseText.match(/"podcastScript"\s*:\s*"([^"]+)"/);
+          
+          if (summaryMatch && scriptMatch) {
+            result = {
+              title: titleMatch ? titleMatch[1] : undefined,
+              transcription: summaryMatch[1],
+              summary: summaryMatch[1],
+              podcastScript: scriptMatch[1],
+            };
+          } else {
+            throw new Error(`無法解析 Gemini 回應為 JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          }
         }
       }
 
@@ -523,7 +554,15 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
       };
     } catch (error: any) {
       const errorMessage = error.message || String(error);
-      console.warn(`[YouTube] Model ${modelName} failed:`, errorMessage);
+      
+      // 對於 JSON 解析錯誤，記錄警告但不中斷（會繼續嘗試下一個模型）
+      if (errorMessage.includes("JSON") || errorMessage.includes("control character") || errorMessage.includes("parse")) {
+        console.warn(`[YouTube] Model ${modelName} JSON parsing issue (will try next model):`, errorMessage.substring(0, 100));
+        lastError = error instanceof Error ? error : new Error(String(error));
+        continue; // 嘗試下一個模型
+      }
+      
+      console.warn(`[YouTube] Model ${modelName} failed:`, errorMessage.substring(0, 200));
       lastError = error instanceof Error ? error : new Error(String(error));
       
       // 處理速率限制錯誤（429）- 嘗試下一個模型
@@ -551,8 +590,9 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
     }
   }
   
-  // 所有模型都失敗
-  throw lastError || new Error("所有 Gemini 模型都無法使用。請檢查 GOOGLE_GEMINI_API_KEY 是否正確設定。");
+  // 所有模型都失敗，這是正常的回退流程，不應該顯示為錯誤
+  console.log(`[YouTube] Gemini 直接分析不可用（所有模型都失敗），將使用傳統方式（下載+轉錄）`);
+  throw lastError || new Error("Gemini 直接分析不可用，將使用傳統方式");
 }
 
 /**
