@@ -447,8 +447,8 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
 }`;
 
   // 使用 Gemini API 直接分析 YouTube URL
-  // 根據 Gemini 文件，可以使用 file_data 格式傳遞 YouTube URL
-  const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${ENV.googleGeminiApiKey}`;
+  // 使用 v1beta API 和 gemini-1.5-flash 模型（支援 YouTube URL）
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${ENV.googleGeminiApiKey}`;
   
   const payload = {
     contents: [{

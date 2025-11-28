@@ -327,9 +327,8 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     }
   }
 
-  // Use v1 API with correct model name
-  // Try gemini-pro first (more stable), fallback to gemini-1.5-flash if needed
-  const apiUrl = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${ENV.googleGeminiApiKey}`;
+  // Use v1beta API with gemini-1.5-flash (most stable and widely available)
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${ENV.googleGeminiApiKey}`;
   
   const response = await fetch(apiUrl, {
     method: "POST",
@@ -352,7 +351,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   const result: InvokeResult = {
     id: `gemini-${Date.now()}`,
     created: Math.floor(Date.now() / 1000),
-    model: geminiResponse.model || "gemini-pro",
+    model: geminiResponse.model || "gemini-1.5-flash",
     choices: geminiResponse.candidates?.map((candidate: any, index: number) => ({
       index,
       message: {
