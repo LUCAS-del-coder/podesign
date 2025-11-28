@@ -405,9 +405,14 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
-    );
+    let errorMessage = `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`;
+    
+    // 如果是 404 錯誤，提供更詳細的錯誤訊息
+    if (response.status === 404) {
+      errorMessage += `\n\n可能的原因：\n1. API Key 不正確或未啟用 Gemini API\n2. 模型名稱不正確\n3. API 端點錯誤\n\n請檢查 GOOGLE_GEMINI_API_KEY 環境變數是否正確設定。`;
+    }
+    
+    throw new Error(errorMessage);
   }
 
   const geminiResponse = await response.json();
