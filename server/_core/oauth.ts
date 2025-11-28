@@ -2,7 +2,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
-import { sdk } from "./sdk";
+import { googleOAuth } from "./googleOAuth";
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -10,44 +10,67 @@ function getQueryParam(req: Request, key: string): string | undefined {
 }
 
 export function registerOAuthRoutes(app: Express) {
+  // Google OAuth 授權端點
+  app.get("/api/oauth/google", (req: Request, res: Response) => {
+    const state = getQueryParam(req, "state") || "";
+    const authUrl = googleOAuth.getAuthorizationUrl(state);
+    res.redirect(302, authUrl);
+  });
+
+  // Google OAuth 回調端點
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
-    const state = getQueryParam(req, "state");
+    const error = getQueryParam(req, "error");
 
-    if (!code || !state) {
-      res.status(400).json({ error: "code and state are required" });
+    if (error) {
+      console.error("[GoogleOAuth] Authorization error:", error);
+      res.redirect(302, `/?error=${encodeURIComponent(error)}`);
+      return;
+    }
+
+    if (!code) {
+      res.status(400).json({ error: "Authorization code is required" });
       return;
     }
 
     try {
-      const tokenResponse = await sdk.exchangeCodeForToken(code, state);
-      const userInfo = await sdk.getUserInfo(tokenResponse.accessToken);
+      // 交換授權碼獲取 access token
+      const tokenResponse = await googleOAuth.exchangeCodeForToken(code);
 
-      if (!userInfo.openId) {
-        res.status(400).json({ error: "openId missing from user info" });
+      // 使用 access token 獲取用戶資訊
+      const userInfo = await googleOAuth.getUserInfo(tokenResponse.access_token);
+
+      if (!userInfo.id) {
+        res.status(400).json({ error: "Google user ID missing from user info" });
         return;
       }
 
+      // 儲存或更新用戶資訊到資料庫
       await db.upsertUser({
-        openId: userInfo.openId,
+        openId: userInfo.id, // 使用 Google ID 作為 openId
         name: userInfo.name || null,
         email: userInfo.email ?? null,
-        loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+        loginMethod: "google",
         lastSignedIn: new Date(),
       });
 
-      const sessionToken = await sdk.createSessionToken(userInfo.openId, {
+      // 建立 session token
+      const sessionToken = await googleOAuth.createSessionToken(userInfo.id, {
         name: userInfo.name || "",
         expiresInMs: ONE_YEAR_MS,
       });
 
+      // 設定 cookie
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       res.redirect(302, "/");
     } catch (error) {
-      console.error("[OAuth] Callback failed", error);
-      res.status(500).json({ error: "OAuth callback failed" });
+      console.error("[GoogleOAuth] Callback failed", error);
+      res.status(500).json({ 
+        error: "Google OAuth callback failed",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 }

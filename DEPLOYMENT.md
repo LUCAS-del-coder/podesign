@@ -75,20 +75,13 @@ DATABASE_URL=mysql://user:password@host:port/database
 # JWT 認證
 JWT_SECRET=your-jwt-secret
 
-# Manus OAuth
-VITE_APP_ID=your-app-id
-OAUTH_SERVER_URL=https://api.manus.im
-VITE_OAUTH_PORTAL_URL=https://manus.im/oauth
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=https://your-domain.com/api/oauth/callback
 
-# 擁有者資訊
-OWNER_OPEN_ID=your-open-id
-OWNER_NAME=your-name
-
-# Manus 內建 API
-BUILT_IN_FORGE_API_URL=https://api.manus.im
-BUILT_IN_FORGE_API_KEY=your-api-key
-VITE_FRONTEND_FORGE_API_KEY=your-frontend-api-key
-VITE_FRONTEND_FORGE_API_URL=https://api.manus.im
+# OpenAI API (語音轉錄)
+OPENAI_API_KEY=your-openai-api-key
 
 # ListenHub TTS API
 LISTENHUB_API_KEY=your-listenhub-api-key
