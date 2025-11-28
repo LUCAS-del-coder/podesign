@@ -70,6 +70,30 @@ export type TranscriptionError = {
  * @param options - Audio data and metadata
  * @returns Transcription result or error
  */
+// Custom fetch implementation with better error handling for Railway
+const customFetch = async (url: string, options?: RequestInit): Promise<Response> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes timeout
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      // Add keep-alive headers for better connection stability
+      headers: {
+        ...options?.headers,
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=300',
+      },
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+};
+
 // Initialize OpenAI client with timeout and retry configuration
 const getOpenAIClient = (): OpenAI => {
   const apiKey = process.env.OPENAI_API_KEY;
@@ -79,7 +103,8 @@ const getOpenAIClient = (): OpenAI => {
   return new OpenAI({ 
     apiKey,
     timeout: 300000, // 5 minutes timeout for large audio files
-    maxRetries: 3, // Retry up to 3 times
+    maxRetries: 0, // Disable SDK retries, we handle retries manually
+    fetch: customFetch, // Use custom fetch with better error handling
   });
 };
 
