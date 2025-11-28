@@ -212,41 +212,41 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
         } else {
           throw new Error(`下載的檔案不存在: ${outputPath}`);
         }
-      }
+    }
 
-      console.log(`[YouTube] 音訊下載完成: ${outputPath}`);
+    console.log(`[YouTube] 音訊下載完成: ${outputPath}`);
 
-      // 讀取檔案
-      const audioBuffer = await fs.readFile(outputPath);
-      const sizeMB = audioBuffer.length / (1024 * 1024);
+    // 讀取檔案
+    const audioBuffer = await fs.readFile(outputPath);
+    const sizeMB = audioBuffer.length / (1024 * 1024);
 
-      console.log(`[YouTube] 音訊檔案大小: ${sizeMB.toFixed(2)}MB`);
+    console.log(`[YouTube] 音訊檔案大小: ${sizeMB.toFixed(2)}MB`);
 
       // 檢查檔案大小（AssemblyAI 限制較寬鬆，但建議不超過 25MB 以確保穩定）
       if (sizeMB > 25) {
-        throw new Error(
+      throw new Error(
           `音訊檔案過大 (${sizeMB.toFixed(2)}MB)，超過 25MB 限制。` +
           `請選擇較短的影片（建議 40 分鐘以內）或使用文字輸入功能。`
-        );
-      }
+      );
+    }
 
-      if (sizeMB < 0.01) {
-        throw new Error(`音訊檔案過小 (${sizeMB.toFixed(2)}MB)，可能下載失敗`);
-      }
+    if (sizeMB < 0.01) {
+      throw new Error(`音訊檔案過小 (${sizeMB.toFixed(2)}MB)，可能下載失敗`);
+    }
 
-      // 上傳到 S3
-      const randomSuffix = crypto.randomBytes(8).toString("hex");
-      const fileKey = `podcast-audio/${videoId}-${randomSuffix}.mp3`;
+    // 上傳到 S3
+    const randomSuffix = crypto.randomBytes(8).toString("hex");
+    const fileKey = `podcast-audio/${videoId}-${randomSuffix}.mp3`;
 
-      console.log(`[YouTube] 上傳音訊到 S3: ${fileKey}`);
-      const { url: audioUrl } = await storagePut(fileKey, audioBuffer, "audio/mpeg");
+    console.log(`[YouTube] 上傳音訊到 S3: ${fileKey}`);
+    const { url: audioUrl } = await storagePut(fileKey, audioBuffer, "audio/mpeg");
 
-      console.log(`[YouTube] 音訊已上傳: ${audioUrl}`);
+    console.log(`[YouTube] 音訊已上傳: ${audioUrl}`);
 
-      return {
-        audioUrl,
-        fileKey,
-        sizeMB,
+    return {
+      audioUrl,
+      fileKey,
+      sizeMB,
         title: title,
       };
     } catch (error: any) {
@@ -446,29 +446,20 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
   "podcastScript": "第三人稱 Podcast 腳本（含 intro、主要內容、outro）"
 }`;
 
-  // 先列出可用模型，找到支援 generateContent 的模型
-  try {
-    const modelsUrl = `https://generativelanguage.googleapis.com/v1/models?key=${ENV.googleGeminiApiKey}`;
-    const modelsResponse = await fetch(modelsUrl);
-    
-    if (modelsResponse.ok) {
-      const modelsData = await modelsResponse.json();
-      const availableModels = modelsData.models || [];
-      console.log(`[YouTube] Available Gemini models: ${availableModels.map((m: any) => m.name).join(', ')}`);
-      
-      // 找到支援 generateContent 的模型
-      const generateContentModel = availableModels.find((m: any) => 
-        m.supportedGenerationMethods?.includes('generateContent')
-      );
-      
-      if (!generateContentModel) {
-        throw new Error("No generateContent model available");
-      }
-      
-      const modelName = generateContentModel.name.replace('models/', '');
-      console.log(`[YouTube] Using Gemini model: ${modelName}`);
-      
-      const apiUrl = `https://generativelanguage.googleapis.com/v1/models/${modelName}:generateContent?key=${ENV.googleGeminiApiKey}`;
+  // 嘗試多個模型和 API 版本
+  const modelConfigs = [
+    { version: "v1", name: "gemini-1.5-flash" },
+    { version: "v1beta", name: "gemini-1.5-flash" },
+    { version: "v1", name: "gemini-1.5-pro" },
+    { version: "v1beta", name: "gemini-1.5-pro" },
+  ];
+  
+  let lastError: Error | null = null;
+  
+  for (const { version, name } of modelConfigs) {
+    try {
+      const apiUrl = `https://generativelanguage.googleapis.com/${version}/models/${name}:generateContent?key=${ENV.googleGeminiApiKey}`;
+      console.log(`[YouTube] Trying Gemini model: ${version}/${name}`);
       
       const payload = {
         contents: [{
@@ -495,7 +486,15 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Gemini API failed: ${response.status} ${response.statusText} – ${errorText}`);
+        const errorJson = JSON.parse(errorText);
+        
+        if (errorJson.error?.code === 404) {
+          console.log(`[YouTube] Model ${version}/${name} not found, trying next...`);
+          lastError = new Error(`Model ${version}/${name} not found`);
+          continue;
+        } else {
+          throw new Error(`Gemini API failed: ${response.status} ${response.statusText} – ${errorText}`);
+        }
       }
       
       // 成功，使用這個回應
@@ -525,7 +524,7 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         throw new Error("Gemini 回應格式不正確，缺少必要欄位");
       }
 
-      console.log(`[YouTube] Gemini 直接分析成功（使用模型：${modelName}）`);
+      console.log(`[YouTube] Gemini 直接分析成功（使用模型：${version}/${name}）`);
       
       return {
         transcription: result.transcription || result.summary || "（由 AI 分析生成）",
@@ -534,13 +533,14 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         language: "zh",
         title: result.title,
       };
-    } else {
-      throw new Error("Failed to list available models");
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      continue;
     }
-  } catch (error) {
-    console.warn(`[YouTube] Gemini 直接分析失敗，將回退到傳統方式:`, error);
-    throw error; // 讓上層函數處理回退
   }
+  
+  // 所有模型都失敗
+  throw lastError || new Error("所有 Gemini 模型都無法使用。請檢查 GOOGLE_GEMINI_API_KEY 是否正確設定。");
 }
 
 /**
@@ -590,21 +590,21 @@ export async function processYoutubeToPodcast(youtubeUrl: string): Promise<{
     
     // 回退到傳統方式：下載並轉錄
     console.log(`[YouTube] 使用傳統方式：下載並轉錄...`);
-    const transcriptionResult = await transcribeYoutubeVideo(youtubeUrl);
+  const transcriptionResult = await transcribeYoutubeVideo(youtubeUrl);
     console.log(`[YouTube] 轉錄完成，文字長度: ${transcriptionResult.text.length} 字元`);
 
     console.log(`[YouTube] 開始分析內容...`);
-    const analysisResult = await analyzePodcastContent(transcriptionResult.text);
+  const analysisResult = await analyzePodcastContent(transcriptionResult.text);
     console.log(`[YouTube] 內容分析完成`);
 
-    return {
-      transcription: transcriptionResult.text,
-      summary: analysisResult.summary,
-      podcastScript: analysisResult.podcastScript,
-      language: transcriptionResult.language,
-      audioUrl: transcriptionResult.audioUrl,
-      audioFileKey: transcriptionResult.audioFileKey,
-      title: transcriptionResult.title,
-    };
+  return {
+    transcription: transcriptionResult.text,
+    summary: analysisResult.summary,
+    podcastScript: analysisResult.podcastScript,
+    language: transcriptionResult.language,
+    audioUrl: transcriptionResult.audioUrl,
+    audioFileKey: transcriptionResult.audioFileKey,
+    title: transcriptionResult.title,
+  };
   }
 }
