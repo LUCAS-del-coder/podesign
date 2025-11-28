@@ -5,9 +5,6 @@
 
 import { ENV } from "./env";
 
-// 注意：這裡需要檢查 ENV 中是否有 googleClientId 和 googleClientSecret
-// 但 ENV 中沒有這些欄位，需要先添加到 env.ts
-
 export interface ValidationResult {
   valid: boolean;
   missing: string[];
