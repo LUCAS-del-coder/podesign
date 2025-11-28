@@ -581,22 +581,18 @@ async function processPodcastTask(
       // 處理 YouTube 影片
       await updateProgress({
         taskId,
-        stage: 'downloading',
-        percent: 10,
-        message: '正在下載 YouTube 影片...',
+        stage: 'analyzing',
+        percent: 20,
+        message: '正在使用 AI 分析 YouTube 影片內容...',
       });
       
-      // 優化：在轉錄完成後立即更新進度
-      const transcriptionPromise = processYoutubeToPodcast(inputContent);
-      
-      // 監聽轉錄進度（如果可能）
-      result = await transcriptionPromise;
+      result = await processYoutubeToPodcast(inputContent);
       
       await updateProgress({
         taskId,
         stage: 'analyzing',
         percent: 60,
-        message: '轉錄完成，正在分析內容...',
+        message: '內容分析完成',
       });
     } else if (inputType === 'text') {
       // 處理文字輸入
