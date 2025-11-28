@@ -28,17 +28,26 @@ function isS3Configured(): boolean {
 function getS3Client(): { client: S3Client; bucket: string; region?: string; publicUrl?: string } {
   // Cloudflare R2 (priority if configured)
   if (ENV.cloudflareAccountId && ENV.cloudflareAccessKeyId && ENV.cloudflareSecretAccessKey && ENV.cloudflareR2Bucket) {
+    // Trim whitespace from credentials (common issue when copying)
+    const accessKeyId = ENV.cloudflareAccessKeyId.trim();
+    const secretAccessKey = ENV.cloudflareSecretAccessKey.trim();
+    
+    // Validate Access Key ID length (should be 32 characters for R2)
+    if (accessKeyId.length !== 32) {
+      throw new Error(`Cloudflare R2 Access Key ID must be 32 characters, got ${accessKeyId.length}. Please check CLOUDFLARE_ACCESS_KEY_ID.`);
+    }
+    
     return {
       client: new S3Client({
         region: 'auto',
         endpoint: `https://${ENV.cloudflareAccountId}.r2.cloudflarestorage.com`,
         credentials: {
-          accessKeyId: ENV.cloudflareAccessKeyId,
-          secretAccessKey: ENV.cloudflareSecretAccessKey,
+          accessKeyId: accessKeyId,
+          secretAccessKey: secretAccessKey,
         },
       }),
-      bucket: ENV.cloudflareR2Bucket,
-      publicUrl: ENV.cloudflareR2PublicUrl,
+      bucket: ENV.cloudflareR2Bucket.trim(),
+      publicUrl: ENV.cloudflareR2PublicUrl?.trim(),
     };
   }
   
@@ -51,12 +60,12 @@ function getS3Client(): { client: S3Client; bucket: string; region?: string; pub
         region: ENV.backblazeRegion || 'us-west-004',
         endpoint: endpoint,
         credentials: {
-          accessKeyId: ENV.backblazeKeyId,
-          secretAccessKey: ENV.backblazeApplicationKey,
+          accessKeyId: ENV.backblazeKeyId.trim(),
+          secretAccessKey: ENV.backblazeApplicationKey.trim(),
         },
       }),
-      bucket: ENV.backblazeBucketName,
-      publicUrl: ENV.backblazePublicUrl,
+      bucket: ENV.backblazeBucketName.trim(),
+      publicUrl: ENV.backblazePublicUrl?.trim(),
     };
   }
   
@@ -64,15 +73,15 @@ function getS3Client(): { client: S3Client; bucket: string; region?: string; pub
   if (ENV.awsAccessKeyId && ENV.awsSecretAccessKey && ENV.awsRegion && ENV.awsS3Bucket) {
     return {
       client: new S3Client({
-        region: ENV.awsRegion,
+        region: ENV.awsRegion.trim(),
         credentials: {
-          accessKeyId: ENV.awsAccessKeyId,
-          secretAccessKey: ENV.awsSecretAccessKey,
+          accessKeyId: ENV.awsAccessKeyId.trim(),
+          secretAccessKey: ENV.awsSecretAccessKey.trim(),
         },
       }),
-      bucket: ENV.awsS3Bucket,
-      region: ENV.awsRegion,
-      publicUrl: ENV.awsS3PublicUrl,
+      bucket: ENV.awsS3Bucket.trim(),
+      region: ENV.awsRegion.trim(),
+      publicUrl: ENV.awsS3PublicUrl?.trim(),
     };
   }
   
