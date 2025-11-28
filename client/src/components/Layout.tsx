@@ -71,7 +71,7 @@ export function Layout({ children }: LayoutProps) {
           >
             <Menu className="h-5 w-5" />
           </Button>
-          <h1 className="text-lg font-semibold">Podesign</h1>
+          <h1 className="text-lg font-semibold">{APP_TITLE}</h1>
         </div>
 
         {/* 頁面內容 */}
