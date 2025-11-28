@@ -117,7 +117,8 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
       
       try {
         // 使用 yt-dlp 的格式選項下載最佳音訊
-        await youtubeDlExec(youtubeUrl, {
+        console.log(`[YouTube] 執行 yt-dlp 下載命令...`);
+        const result = await youtubeDlExec(youtubeUrl, {
           format: 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
           output: outputTemplate,
           noWarnings: true,
@@ -125,9 +126,21 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
           noCheckCertificate: true,
           preferFreeFormats: true,
         });
+        
+        console.log(`[YouTube] yt-dlp 執行完成，結果:`, result);
       } catch (downloadError: any) {
+        // 詳細記錄錯誤資訊
         console.error(`[YouTube] yt-dlp 下載錯誤:`, downloadError.message || downloadError);
-        console.error(`[YouTube] 錯誤詳情:`, downloadError);
+        console.error(`[YouTube] 錯誤類型:`, downloadError.constructor?.name);
+        console.error(`[YouTube] 錯誤堆疊:`, downloadError.stack);
+        
+        // 檢查錯誤的 stdout 和 stderr
+        if (downloadError.stdout) {
+          console.error(`[YouTube] yt-dlp stdout:`, downloadError.stdout);
+        }
+        if (downloadError.stderr) {
+          console.error(`[YouTube] yt-dlp stderr:`, downloadError.stderr);
+        }
         
         // 檢查是否實際上下載了檔案（即使有錯誤）
         const filesAfterError = await fs.readdir(tempDir);
@@ -136,10 +149,18 @@ async function downloadYoutubeAudio(youtubeUrl: string): Promise<{
         // 如果錯誤但檔案存在，繼續處理
         if (filesAfterError.length === 0) {
           // 如果完全沒有檔案，檢查是否是特定錯誤
-          if (downloadError.message?.includes('403') || downloadError.stderr?.includes('403')) {
+          const errorMessage = downloadError.message || '';
+          const errorStderr = downloadError.stderr || '';
+          
+          if (errorMessage.includes('403') || errorStderr.includes('403')) {
             throw new Error('YouTube 暫時限制存取（403），請稍後重試或嘗試其他影片');
           }
-          throw downloadError;
+          if (errorMessage.includes('yt-dlp') || errorMessage.includes('not found')) {
+            throw new Error('yt-dlp 無法執行。請檢查 Railway 環境是否支援執行外部二進位檔');
+          }
+          
+          // 提供更詳細的錯誤訊息
+          throw new Error(`YouTube 下載失敗: ${errorMessage || '未知錯誤'}`);
         }
       }
 

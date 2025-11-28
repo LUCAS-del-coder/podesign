@@ -2,9 +2,16 @@
 FROM node:22-slim
 
 # 安裝必要的系統工具（僅用於建置和運行）
+# 包括 Python 和必要的依賴，以支援 youtube-dl-exec (yt-dlp)
 RUN apt-get update && apt-get install -y \
     curl \
+    python3 \
+    python3-pip \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# 安裝 yt-dlp（youtube-dl-exec 的依賴）
+RUN pip3 install --no-cache-dir yt-dlp
 
 # 設定工作目錄
 WORKDIR /app
