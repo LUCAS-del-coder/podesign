@@ -199,23 +199,64 @@ export async function storagePut(
       
       await client.send(command);
       
-      // Generate public URL
+      // Generate public URL or signed URL
       let url: string;
+      
+      // Priority 1: Custom public URL
       if (publicUrl) {
         url = `${publicUrl}/${key}`;
-      } else if (ENV.cloudflareAccountId && ENV.cloudflareR2PublicUrl) {
+      }
+      // Priority 2: Cloudflare R2 custom domain
+      else if (ENV.cloudflareAccountId && ENV.cloudflareR2PublicUrl) {
         url = `${ENV.cloudflareR2PublicUrl}/${key}`;
-      } else if (ENV.backblazeKeyId && ENV.backblazePublicUrl) {
+      }
+      // Priority 3: Backblaze B2 custom domain
+      else if (ENV.backblazeKeyId && ENV.backblazePublicUrl) {
         url = `${ENV.backblazePublicUrl}/${key}`;
-      } else if (region) {
-        // AWS S3 default URL format
+      }
+      // Priority 4: AWS S3 default URL format
+      else if (region) {
         url = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
-      } else {
-        // Fallback: use bucket name as domain (for R2 with custom domain)
+      }
+      // Priority 5: Cloudflare R2 - Generate signed URL (required for private access)
+      else if (ENV.cloudflareAccountId) {
+        // Cloudflare R2 files are private by default, must use signed URL
+        console.log(`[Storage] Generating signed URL for Cloudflare R2...`);
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: bucket,
+            Key: key,
+          });
+          url = await getSignedUrl(client, getCommand, { expiresIn: 3600 * 24 * 7 }); // 7 days
+          console.log(`[Storage] ${storageType} generated signed URL (valid for 7 days)`);
+        } catch (signError) {
+          console.error(`[Storage] Failed to generate signed URL:`, signError);
+          throw new Error(`Failed to generate Cloudflare R2 signed URL: ${signError instanceof Error ? signError.message : 'Unknown error'}. Please ensure R2 credentials are correct.`);
+        }
+      }
+      // Priority 6: Backblaze B2 - Generate signed URL if needed
+      else if (ENV.backblazeKeyId) {
+        // Backblaze B2 may also need signed URL if not public
+        try {
+          const getCommand = new GetObjectCommand({
+            Bucket: bucket,
+            Key: key,
+          });
+          url = await getSignedUrl(client, getCommand, { expiresIn: 3600 * 24 * 7 }); // 7 days
+          console.log(`[Storage] ${storageType} generated signed URL (valid for 7 days)`);
+        } catch (signError) {
+          console.warn(`[Storage] Failed to generate signed URL, using default format:`, signError);
+          // Fallback to default B2 URL format
+          url = `https://f${ENV.backblazeBucketName}.s3.${ENV.backblazeRegion || 'us-west-004'}.backblazeb2.com/${key}`;
+        }
+      }
+      // Fallback
+      else {
         url = `https://${bucket}/${key}`;
       }
       
-      console.log(`[Storage] ${storageType} upload successful: ${url}`);
+      console.log(`[Storage] ${storageType} upload successful`);
+      console.log(`[Storage] File URL: ${url.substring(0, 150)}...`);
       return { key, url };
     } catch (error) {
       console.error(`[Storage] S3-compatible upload failed:`, error);
