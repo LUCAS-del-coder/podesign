@@ -57,12 +57,20 @@ export async function identifyHighlights(
 Podcast 文字稿：
 ${fullTranscript}
 
-請以 JSON 格式回傳**1個**精華片段，包含：
-- title: 精華片段標題（繁體中文，簡短有吸引力，10-20 字）
-- description: 精華片段描述（繁體中文，說明為什麼這段精彩，30-50 字）
-- startIndex: 開始的對話索引（對應 [數字]）
-- endIndex: 結束的對話索引（對應 [數字]）
-- reason: 選擇這段的理由（繁體中文，內部使用）
+請以 JSON 格式回傳，格式必須是：
+{
+  "segments": [
+    {
+      "title": "精華片段標題（繁體中文，簡短有吸引力，10-20 字）",
+      "description": "精華片段描述（繁體中文，說明為什麼這段精彩，30-50 字）",
+      "startIndex": 開始的對話索引（對應 [數字]，必須是整數）,
+      "endIndex": 結束的對話索引（對應 [數字]，必須是整數）,
+      "reason": "選擇這段的理由（繁體中文，內部使用）"
+    }
+  ]
+}
+
+**重要**：segments 數組必須包含且僅包含 1 個對象。
 
 重要限制：
 - **只返回 1 個片段**，長度約 ${targetDuration} 秒（允許 ±5 秒誤差）
@@ -130,6 +138,9 @@ ${fullTranscript}
     // 確保 content 是字串
     const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
     
+    // **調試**：記錄原始回應（前500字符）
+    console.log(`[HighlightService] Raw LLM response (first 500 chars): ${contentStr.substring(0, 500)}`);
+    
     // 清理和提取 JSON 的輔助函數（改進版，處理 markdown 代碼塊和數組格式）
     const cleanJsonString = (text: string): string => {
       // 1. 移除所有 markdown 代碼塊標記（```json ... ``` 或 ``` ... ```）
@@ -183,13 +194,19 @@ ${fullTranscript}
       } else if (parsed.segments && Array.isArray(parsed.segments)) {
         // 已經是正確格式
         result = parsed;
+      } else if (parsed.title && typeof parsed.startIndex === 'number') {
+        // **修復**：如果返回的是單個對象而不是數組，包裝成 segments 數組
+        console.log(`[HighlightService] LLM returned single object in first parse, wrapping in segments array`);
+        result = { segments: [parsed] };
       } else {
         // 嘗試從對象中提取數組
         const segments = parsed.segments || parsed.highlights || parsed.items || [];
         if (Array.isArray(segments)) {
           result = { segments };
         } else {
-          throw new Error("LLM 回應格式不正確：找不到 segments 數組");
+          // **調試**：記錄解析失敗的內容
+          console.error(`[HighlightService] Failed to parse response. Parsed object:`, JSON.stringify(parsed, null, 2).substring(0, 1000));
+          throw new Error("LLM 回應格式不正確：找不到 segments 數組或單個片段對象");
         }
       }
     } catch (parseError) {
@@ -230,8 +247,14 @@ ${fullTranscript}
           result = { segments: parsed };
         } else if (parsed.segments && Array.isArray(parsed.segments)) {
           result = parsed;
+        } else if (parsed.title && typeof parsed.startIndex === 'number') {
+          // **修復**：如果返回的是單個對象而不是數組，包裝成 segments 數組
+          console.log(`[HighlightService] LLM returned single object, wrapping in segments array`);
+          result = { segments: [parsed] };
         } else {
-          throw new Error("LLM 回應格式不正確：找不到 segments 數組");
+          // **調試**：記錄解析失敗的內容
+          console.error(`[HighlightService] Failed to parse response. Parsed object:`, JSON.stringify(parsed, null, 2).substring(0, 1000));
+          throw new Error("LLM 回應格式不正確：找不到 segments 數組或單個片段對象");
         }
       } catch (extractError) {
         console.error(`[HighlightService] JSON parsing failed. Content preview: ${contentStr.substring(0, 500)}`);
