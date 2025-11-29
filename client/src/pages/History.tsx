@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { TaskProgressBar } from "@/components/TaskProgressBar";
-import { AvatarVideoPlayer } from "@/components/AvatarVideoPlayer";
 
 // 進度顯示組件
 function TaskProgressDisplay({ taskId }: { taskId: number }) {
@@ -75,28 +74,59 @@ export default function History() {
 
   const generateHighlightsMutation = trpc.podcast.generateHighlights.useMutation({
     onSuccess: (data, variables) => {
-      toast.success(`已生成 ${data.highlights.length} 個精華片段！`);
-      setGeneratingHighlights(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(variables.taskId);
-        return newSet;
-      });
-      // 重新獲取任務列表
-      taskListQuery.refetch();
+      // 注意：這裡不顯示 toast，因為 handleGenerateHighlights 會處理所有三個長度的生成
+      // 也不更新狀態，因為 handleGenerateHighlights 會統一處理
     },
     onError: (error, variables) => {
-      toast.error(`生成精華片段失敗：${error.message}`);
-      setGeneratingHighlights(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(variables.taskId);
-        return newSet;
-      });
+      // 錯誤處理在 handleGenerateHighlights 中統一處理
+      console.error(`生成精華片段失敗:`, error);
     },
   });
 
-  const handleGenerateHighlights = (taskId: number) => {
+  const handleGenerateHighlights = async (taskId: number) => {
     setGeneratingHighlights(prev => new Set(prev).add(taskId));
-    generateHighlightsMutation.mutate({ taskId });
+    
+    // **修改 2**：生成三個不同長度的精華片段（20秒、40秒、60秒）
+    try {
+      const allHighlights: any[] = [];
+      
+      // 串行生成三個不同長度的精華片段
+      const durations = [20, 40, 60];
+      for (const duration of durations) {
+        try {
+          const result = await generateHighlightsMutation.mutateAsync({ 
+            taskId, 
+            targetDuration: duration 
+          });
+          allHighlights.push(...result.highlights);
+        } catch (error) {
+          // 如果某個長度失敗，繼續生成其他長度
+          console.warn(`生成 ${duration} 秒精華片段失敗:`, error);
+        }
+      }
+      
+      if (allHighlights.length > 0) {
+        toast.success(`已生成 ${allHighlights.length} 個精華片段（20秒、40秒、60秒）！`);
+        
+        // **修復 3**：直接更新 taskHighlights 狀態，立即顯示生成的精華片段
+        setTaskHighlights(prev => {
+          const newMap = new Map(prev);
+          newMap.set(taskId, allHighlights);
+          return newMap;
+        });
+      } else {
+        toast.error('所有精華片段生成都失敗了');
+      }
+    } catch (error) {
+      // 錯誤已在 mutation 的 onError 中處理
+      console.error('生成精華片段時發生錯誤:', error);
+    } finally {
+      setGeneratingHighlights(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+    }
   };
 
   const deleteTaskMutation = trpc.podcast.delete.useMutation({
@@ -479,15 +509,6 @@ export default function History() {
                                         </Button>
                                       </div>
                                     )}
-                                    
-                                    {/* 虛擬主播影片播放器 */}
-                                    <AvatarVideoPlayer 
-                                      highlightId={highlight.id} 
-                                      highlight={{
-                                        duration: highlight.duration,
-                                        title: highlight.title
-                                      }}
-                                    />
 
                                   </div>
                                 ))}
