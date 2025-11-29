@@ -332,25 +332,25 @@ ${fullTranscript}
         console.log(`[HighlightService] Extended segment from index ${endIndex} to ${extendedEndIndex} (${charCount} -> ${extendedCharCount} chars, ${Math.ceil(charCount * avgSecondsPerChar)}s -> ${estimatedDuration}s)`);
       }
       
-      // **關鍵改進**：強制使用目標時長（如果估算值在合理範圍內）
+      // **關鍵改進**：強制使用目標時長
       // 這樣可以確保實際剪輯的音檔長度符合目標
       // 對於60秒的精華片段，允許使用60秒（不截斷）
       const maxAllowedDuration = targetDuration === 60 ? 60 : MAX_HIGHLIGHT_DURATION;
       
-      if (estimatedDuration >= targetDuration * 0.7 && estimatedDuration <= maxAllowedDuration) {
-        // 如果估算值在合理範圍內，使用目標時長
-        estimatedDuration = Math.min(targetDuration, maxAllowedDuration);
+      // **修復**：優先使用目標時長，而不是估算值或截斷值
+      // 如果目標時長在允許範圍內，直接使用目標時長
+      if (targetDuration <= maxAllowedDuration) {
+        estimatedDuration = targetDuration;
         console.log(`[HighlightService] Using target duration: ${estimatedDuration}s (target: ${targetDuration}s, maxAllowed: ${maxAllowedDuration}s)`);
-      } else if (estimatedDuration < targetDuration * 0.7) {
-        // 如果估算值太小，至少使用目標時長的70%（但不能超過限制）
-        estimatedDuration = Math.min(Math.max(estimatedDuration, Math.floor(targetDuration * 0.7)), maxAllowedDuration);
-        console.log(`[HighlightService] Estimated duration too small, using minimum: ${estimatedDuration}s (target: ${targetDuration}s)`);
+      } else {
+        // 如果目標時長超過限制（理論上不應該發生），使用最大允許時長
+        estimatedDuration = maxAllowedDuration;
+        console.warn(`[HighlightService] Target duration (${targetDuration}s) exceeds max allowed (${maxAllowedDuration}s), using max allowed`);
       }
       
-      // 限制精華片段最多 maxAllowedDuration 秒
-      // 對於60秒的精華片段，允許使用60秒；其他情況使用59秒
+      // 驗證：確保最終時長不超過限制
       if (estimatedDuration > maxAllowedDuration) {
-        console.warn(`[HighlightService] Highlight duration (${estimatedDuration}s) exceeds limit (${maxAllowedDuration}s), truncating`);
+        console.warn(`[HighlightService] Final duration (${estimatedDuration}s) exceeds limit (${maxAllowedDuration}s), truncating`);
         estimatedDuration = maxAllowedDuration;
       }
       
