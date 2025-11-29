@@ -289,7 +289,7 @@ ${fullTranscript}
 
       // 提取對應的文字內容
       const segmentScripts = scripts.slice(startIndex, endIndex + 1);
-      const transcript = segmentScripts
+      let transcript = segmentScripts
         .map((s) => `${s.speakerName}: ${s.content}`)
         .join("\n");
 
