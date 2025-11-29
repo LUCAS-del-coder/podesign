@@ -207,9 +207,9 @@ export async function waitForPodcastCompletion(
 
   console.log(`[ListenHub] Waiting for episode ${episodeId} to complete... (max wait: ${maxWaitTime / 1000 / 60} minutes)`);
 
-  // 優化：減少初始等待時間（從 60 秒改為 30 秒）
-  // 因為 ListenHub 通常在 30-60 秒內完成 quick 模式，deep 模式可能需要更長時間
-  await new Promise((resolve) => setTimeout(resolve, 30000));
+  // 優化：減少初始等待時間（從 30 秒改為 10 秒）
+  // 因為 ListenHub 通常在 30-60 秒內完成 quick 模式，但我們可以更快地開始檢查
+  await new Promise((resolve) => setTimeout(resolve, 10000));
 
   // 使用動態輪詢間隔：開始時頻繁查詢，之後逐漸延長
   let pollInterval = 5000; // 初始 5 秒
@@ -254,26 +254,23 @@ export async function waitForPodcastCompletion(
         // 使用 warn 而不是 error，因為這可能是暫時的問題
         console.warn(`[ListenHub] ⚠️  ${errorMsg}`);
         
-        // 等待一小段時間後再拋出錯誤，給 ListenHub 一些時間可能恢復
-        // 但通常如果狀態已經是 failed，就不會再恢復了
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        
+        // 立即拋出錯誤，不要繼續等待（failed 狀態不會恢復）
         throw new Error(errorMsg);
       }
 
       // 如果仍然是 pending，增加計數
       consecutivePendingCount++;
       
-      // 動態調整輪詢間隔：
-      // - 前 3 次：每 5 秒查詢（快速響應）
-      // - 4-10 次：每 10 秒查詢（正常速度）
-      // - 之後：每 15 秒查詢（節省 API 調用）
-      if (consecutivePendingCount <= 3) {
+      // 動態調整輪詢間隔（優化：更快的響應速度）：
+      // - 前 5 次：每 3 秒查詢（快速響應）
+      // - 6-15 次：每 5 秒查詢（正常速度）
+      // - 之後：每 10 秒查詢（節省 API 調用）
+      if (consecutivePendingCount <= 5) {
+        pollInterval = 3000; // 3 秒（更快）
+      } else if (consecutivePendingCount <= 15) {
         pollInterval = 5000; // 5 秒
-      } else if (consecutivePendingCount <= 10) {
-        pollInterval = 10000; // 10 秒
       } else {
-        pollInterval = 15000; // 15 秒
+        pollInterval = 10000; // 10 秒
       }
 
       const elapsed = Date.now() - startTime;
@@ -289,6 +286,11 @@ export async function waitForPodcastCompletion(
 
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
     } catch (error) {
+      // 如果錯誤是 episode failed，立即重新拋出（不要繼續重試）
+      if (error instanceof Error && error.message.includes("Episode generation failed")) {
+        throw error;
+      }
+      
       // 如果查詢失敗，記錄錯誤但繼續重試（可能是暫時的網路問題）
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       console.warn(`[ListenHub] ⚠️  Error checking episode ${episodeId} status (${elapsed}s elapsed):`, error instanceof Error ? error.message : String(error));
