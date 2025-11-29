@@ -111,12 +111,24 @@ export default function History() {
       if (allHighlights.length > 0) {
         toast.success(`已生成 ${allHighlights.length} 個精華片段（20秒、40秒、60秒各一個）！`);
         
-        // **修復 3**：直接更新 taskHighlights 狀態，立即顯示生成的精華片段
-        setTaskHighlights(prev => {
-          const newMap = new Map(prev);
-          newMap.set(taskId, allHighlights);
-          return newMap;
-        });
+        // **修復**：重新從資料庫獲取完整的精華片段數據（包含 audioUrl）
+        // 這樣可以確保獲取到最新的數據，包括完整的 audioUrl
+        try {
+          const freshData = await utils.podcast.getHighlights.fetch({ taskId });
+          setTaskHighlights(prev => {
+            const newMap = new Map(prev);
+            newMap.set(taskId, freshData);
+            return newMap;
+          });
+        } catch (error) {
+          console.error('重新獲取精華片段失敗:', error);
+          // 如果重新獲取失敗，至少使用 mutation 返回的數據
+          setTaskHighlights(prev => {
+            const newMap = new Map(prev);
+            newMap.set(taskId, allHighlights);
+            return newMap;
+          });
+        }
       } else {
         toast.error('所有精華片段生成都失敗了');
       }
