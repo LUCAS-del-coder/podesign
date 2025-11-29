@@ -238,6 +238,15 @@ ${fullTranscript}
         throw new Error(`無法解析 LLM 回應為 JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
       }
     }
+    
+    // 驗證結果格式
+    if (!result.segments || !Array.isArray(result.segments) || result.segments.length === 0) {
+      throw new Error("LLM 回應格式不正確：找不到 segments 數組或數組為空");
+    }
+
+    // **修復**：只取第一個片段（因為我們要求只生成1個）
+    const segmentsToProcess = result.segments.slice(0, 1);
+    
     const segments: HighlightSegment[] = [];
 
     // 估算每個對話的平均時長（假設每個字 0.3 秒）
