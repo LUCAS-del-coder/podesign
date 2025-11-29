@@ -43,7 +43,10 @@ export async function identifyHighlights(
   // 使用 LLM 分析文字稿，找出精華片段
   const prompt = `你是一位專業的 Podcast 編輯，擅長從完整的 Podcast 中找出最精彩的片段。
 
-請分析以下 Podcast 文字稿，找出 2-3 個最精彩的片段，總長度約 ${targetDuration} 秒。
+**重要要求**：
+- 你必須只找出 **1 個**最精彩的片段，長度約 ${targetDuration} 秒（不能多也不能少）
+- 所有回應必須使用**繁體中文**，包括標題、描述和理由
+- 你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）
 
 精華片段的標準：
 1. **高潮時刻**：討論最激烈、最有趣的部分
@@ -54,20 +57,21 @@ export async function identifyHighlights(
 Podcast 文字稿：
 ${fullTranscript}
 
-請以 JSON 格式回傳精華片段列表，每個片段包含：
-- title: 精華片段標題（簡短有吸引力，10-20 字）
-- description: 精華片段描述（說明為什麼這段精彩，30-50 字）
+請以 JSON 格式回傳**1個**精華片段，包含：
+- title: 精華片段標題（繁體中文，簡短有吸引力，10-20 字）
+- description: 精華片段描述（繁體中文，說明為什麼這段精彩，30-50 字）
 - startIndex: 開始的對話索引（對應 [數字]）
 - endIndex: 結束的對話索引（對應 [數字]）
-- reason: 選擇這段的理由（內部使用）
+- reason: 選擇這段的理由（繁體中文，內部使用）
 
 重要限制：
-- **每個精華片段的長度不能超過 60 秒**（用於生成虛擬主播影片）
+- **只返回 1 個片段**，長度約 ${targetDuration} 秒（允許 ±5 秒誤差）
+- **每個精華片段的長度不能超過 60 秒**
 - 每個片段應該是完整的對話片段，不要在句子中間切斷
-- 片段之間不要重疊
-- 優先選擇最精彩的部分，而不是平均分配
+- 優先選擇最精彩的部分
 
 **重要**：你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）。
+**重要**：所有文字內容必須使用繁體中文。
 
 請只回傳 JSON 格式，不要包含其他文字或 markdown 代碼塊。`;
 
@@ -80,7 +84,7 @@ ${fullTranscript}
       messages: [
         {
           role: "system",
-          content: "你是一位專業的 Podcast 編輯，擅長識別精華片段。**重要**：你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）。",
+          content: "你是一位專業的 Podcast 編輯，擅長識別精華片段。**重要**：你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）。**重要**：所有文字內容必須使用繁體中文，包括標題、描述和理由。",
         },
         {
           role: "user",
@@ -239,7 +243,7 @@ ${fullTranscript}
     // 估算每個對話的平均時長（假設每個字 0.3 秒）
     const avgSecondsPerChar = 0.3;
 
-    for (const segment of result.segments) {
+    for (const segment of segmentsToProcess) {
       const { title, description, startIndex, endIndex, reason } = segment;
 
       // 提取對應的文字內容

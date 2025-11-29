@@ -86,11 +86,11 @@ export default function History() {
   const handleGenerateHighlights = async (taskId: number) => {
     setGeneratingHighlights(prev => new Set(prev).add(taskId));
     
-    // **修改 2**：生成三個不同長度的精華片段（20秒、40秒、60秒）
+    // **修改 2**：生成三個不同長度的精華片段（20秒、40秒、60秒），每個長度只生成1個
     try {
       const allHighlights: any[] = [];
       
-      // 串行生成三個不同長度的精華片段
+      // 串行生成三個不同長度的精華片段（每個只生成1個）
       const durations = [20, 40, 60];
       for (const duration of durations) {
         try {
@@ -98,7 +98,10 @@ export default function History() {
             taskId, 
             targetDuration: duration 
           });
-          allHighlights.push(...result.highlights);
+          // **修復**：只取第一個片段（因為後端現在只返回1個）
+          if (result.highlights && result.highlights.length > 0) {
+            allHighlights.push(result.highlights[0]);
+          }
         } catch (error) {
           // 如果某個長度失敗，繼續生成其他長度
           console.warn(`生成 ${duration} 秒精華片段失敗:`, error);
@@ -106,7 +109,7 @@ export default function History() {
       }
       
       if (allHighlights.length > 0) {
-        toast.success(`已生成 ${allHighlights.length} 個精華片段（20秒、40秒、60秒）！`);
+        toast.success(`已生成 ${allHighlights.length} 個精華片段（20秒、40秒、60秒各一個）！`);
         
         // **修復 3**：直接更新 taskHighlights 狀態，立即顯示生成的精華片段
         setTaskHighlights(prev => {
