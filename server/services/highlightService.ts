@@ -47,6 +47,7 @@ export async function identifyHighlights(
 - 你必須只找出 **1 個**最精彩的片段，長度約 ${targetDuration} 秒（不能多也不能少）
 - 所有回應必須使用**繁體中文**，包括標題、描述和理由
 - 你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）
+- **重要**：每次調用時，你必須選擇**不同的**精彩片段，不要重複選擇相同的 startIndex 和 endIndex
 
 精華片段的標準：
 1. **高潮時刻**：討論最激烈、最有趣的部分
