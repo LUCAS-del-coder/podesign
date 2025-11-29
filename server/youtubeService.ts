@@ -19,6 +19,36 @@ import { promisify } from "util";
 const execFileAsync = promisify(execFile);
 
 /**
+ * 計算兩個字符串的相似度（使用 Levenshtein 距離）
+ */
+function calculateSimilarity(str1: string, str2: string): number {
+  if (str1 === str2) return 1.0;
+  if (str1.length === 0 || str2.length === 0) return 0.0;
+  
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  // 使用簡單的字符匹配來計算相似度
+  let matches = 0;
+  const minLength = Math.min(longer.length, shorter.length);
+  
+  for (let i = 0; i < minLength; i++) {
+    if (longer[i] === shorter[i]) {
+      matches++;
+    }
+  }
+  
+  // 計算包含關係
+  if (longer.includes(shorter) || shorter.includes(longer)) {
+    return Math.max(0.9, matches / longer.length);
+  }
+  
+  return matches / longer.length;
+}
+
+/**
  * 從 YouTube URL 提取影片 ID
  */
 export function extractVideoId(url: string): string | null {
@@ -522,8 +552,37 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
     );
   }
   
+  // **關鍵改進**：先用 yt-dlp 獲取實際的影片標題和基本信息，用於驗證
+  let actualTitle = "";
+  let actualDuration = 0;
+  try {
+    console.log(`[YouTube] 🔍 先獲取實際影片資訊以驗證 Gemini 回應...`);
+    const { stdout: infoStdout } = await execFileAsync('yt-dlp', [
+      '--dump-json',
+      '--no-warnings',
+      '--no-call-home',
+      '--no-check-certificate',
+      youtubeUrl,
+    ], { maxBuffer: 1024 * 1024 * 10 });
+    
+    const videoInfo = JSON.parse(infoStdout);
+    actualTitle = videoInfo.title || "";
+    actualDuration = videoInfo.duration || 0;
+    
+    console.log(`[YouTube] ✅ 實際影片標題: ${actualTitle}`);
+    console.log(`[YouTube] ✅ 實際影片長度: ${actualDuration} 秒`);
+    
+    if (!actualTitle || actualTitle.trim().length === 0) {
+      throw new Error("無法獲取影片標題，無法驗證 Gemini 回應");
+    }
+  } catch (error) {
+    console.warn(`[YouTube] ⚠️  無法獲取實際影片資訊:`, error instanceof Error ? error.message : String(error));
+    console.warn(`[YouTube] ⚠️  將回退到傳統方式以確保正確性`);
+    throw new Error("無法獲取實際影片資訊，回退到傳統方式");
+  }
+  
   // 記錄實際傳遞給 Gemini 的 URL 和 Video ID
-  console.log(`[YouTube] 🔍 Passing to Gemini - URL: ${youtubeUrl}, Video ID: ${videoId}`);
+  console.log(`[YouTube] 🔍 Passing to Gemini - URL: ${youtubeUrl}, Video ID: ${videoId}, Actual Title: ${actualTitle}`);
   
   const systemPrompt = `你是專業的 Podcast 編輯。你必須分析指定的 YouTube 影片並生成繁體中文 Podcast 內容。
 
@@ -552,12 +611,21 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
 
 **影片網址**：${youtubeUrl}
 **Video ID**：${videoId}
+**實際影片標題**：${actualTitle}
+**影片長度**：${actualDuration} 秒
 
-**重要提醒**：
-- 你必須分析這個特定的影片（Video ID: ${videoId}）
-- 不能分析其他影片
-- 回應中的 videoId 必須是 "${videoId}"
-- 如果無法訪問這個影片，請明確說明，不要返回其他影片的內容
+**嚴格要求**：
+1. 你必須分析這個特定的影片（Video ID: ${videoId}）
+2. 回應中的 videoId 必須完全匹配 "${videoId}"（不能有任何差異）
+3. 回應中的 title 必須完全匹配 "${actualTitle}"（不能有任何差異）
+4. 如果無法訪問這個影片或標題不匹配，請明確說明，不要返回其他影片的內容
+5. 你必須觀看這個特定的 URL：${youtubeUrl}
+
+**驗證步驟**：
+- 確認你分析的影片 Video ID 是 ${videoId}
+- 確認你分析的影片標題是 "${actualTitle}"
+- 只有當這兩個都匹配時，才返回分析結果
+- 如果不匹配，請在回應中明確說明無法訪問或標題不匹配
 
 請直接觀看這個影片的內容並以 JSON 格式回應。`;
 
@@ -711,16 +779,40 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         throw new Error(`Video ID mismatch: expected ${videoId}, got ${returnedVideoId}`);
       }
       
-      // 驗證：檢查返回的標題是否合理
+      // **關鍵驗證**：檢查返回的標題是否與實際標題匹配
       const returnedTitle = result.title || "";
       if (!returnedTitle || returnedTitle.trim().length === 0) {
         console.error(`[YouTube] ❌ Warning: Returned title is empty`);
         throw new Error("Gemini returned empty title");
       }
       
+      // **嚴格驗證標題匹配**：確保 Gemini 分析的是正確的影片
+      // 使用模糊匹配，允許一些差異（如空格、標點符號）
+      const normalizeTitle = (title: string) => {
+        return title
+          .toLowerCase()
+          .replace(/\s+/g, ' ')
+          .replace(/[^\w\s\u4e00-\u9fff]/g, '')
+          .trim();
+      };
+      
+      const normalizedActual = normalizeTitle(actualTitle);
+      const normalizedReturned = normalizeTitle(returnedTitle);
+      
+      // 檢查標題是否匹配（允許 90% 相似度）
+      const similarity = calculateSimilarity(normalizedActual, normalizedReturned);
+      if (similarity < 0.9) {
+        console.error(`[YouTube] ❌ Title mismatch!`);
+        console.error(`[YouTube] ❌ Expected: "${actualTitle}"`);
+        console.error(`[YouTube] ❌ Got: "${returnedTitle}"`);
+        console.error(`[YouTube] ❌ Similarity: ${(similarity * 100).toFixed(1)}%`);
+        console.error(`[YouTube] ❌ This indicates Gemini analyzed a different video. Falling back to traditional method.`);
+        throw new Error(`Title mismatch: expected "${actualTitle}", got "${returnedTitle}" (similarity: ${(similarity * 100).toFixed(1)}%)`);
+      }
+      
       // 所有驗證通過
       console.log(`[YouTube] ✅ Video ID verification passed: ${videoId}`);
-      console.log(`[YouTube] ✅ Title: ${returnedTitle}`);
+      console.log(`[YouTube] ✅ Title verification passed: "${returnedTitle}" (similarity: ${(similarity * 100).toFixed(1)}%)`);
       
       console.log(`[YouTube] ✅ Gemini 直接分析成功（使用模型：${modelName}）`);
       console.log(`[YouTube] ✅ Video ID: ${videoId}, Title: ${returnedTitle}`);
