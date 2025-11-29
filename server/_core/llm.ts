@@ -327,10 +327,12 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     },
   };
 
-  // Note: gemini-pro doesn't support responseMimeType in generationConfig
-  // We'll request JSON format in the prompt instead
-  if (normalizedResponseFormat?.type === "json_object") {
-    // Add instruction to return JSON in the last user message
+  // Gemini 2.0+ supports responseMimeType for structured output
+  if (normalizedResponseFormat?.type === "json_object" || normalizedResponseFormat?.type === "json_schema") {
+    // Use responseMimeType for structured JSON output (Gemini 2.0+)
+    payload.generationConfig.responseMimeType = "application/json";
+    
+    // Also add instruction to return JSON in the prompt for better compatibility
     const lastMessage = geminiMessages[geminiMessages.length - 1];
     if (lastMessage && lastMessage.role === "user" && lastMessage.parts) {
       const lastPart = lastMessage.parts[lastMessage.parts.length - 1];
@@ -359,12 +361,21 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   for (const modelName of modelNames) {
     try {
       console.log(`[LLM] Trying model: ${modelName}`);
+      
+      // Build generation config with optional responseMimeType
+      const generationConfig: any = {
+        temperature: 0.7,
+        maxOutputTokens: 4096,
+      };
+      
+      // Add responseMimeType for JSON output (Gemini 2.0+)
+      if (normalizedResponseFormat?.type === "json_object" || normalizedResponseFormat?.type === "json_schema") {
+        generationConfig.responseMimeType = "application/json";
+      }
+      
       const model = client.getGenerativeModel({ 
         model: modelName,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4096,
-        },
+        generationConfig,
       });
       
       // Use generateContent instead of chat for simpler API
