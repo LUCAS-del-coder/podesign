@@ -67,7 +67,9 @@ ${fullTranscript}
 - 片段之間不要重疊
 - 優先選擇最精彩的部分，而不是平均分配
 
-請只回傳 JSON 陣列，不要包含其他文字。`;
+**重要**：你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）。
+
+請只回傳 JSON 格式，不要包含其他文字或 markdown 代碼塊。`;
 
   // 每個精華片段的最大長度（秒）
   // Kling AI API 要求音訊時長必須在 2-60 秒之間，設定為 59 秒留出安全邊界
@@ -78,7 +80,7 @@ ${fullTranscript}
       messages: [
         {
           role: "system",
-          content: "你是一位專業的 Podcast 編輯，擅長識別精華片段。請以 JSON 格式回應。",
+          content: "你是一位專業的 Podcast 編輯，擅長識別精華片段。**重要**：你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）。",
         },
         {
           role: "user",
@@ -123,7 +125,62 @@ ${fullTranscript}
 
     // 確保 content 是字串
     const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
-    const result = JSON.parse(contentStr);
+    
+    // 清理和提取 JSON 的輔助函數（改進版，處理 markdown 代碼塊）
+    const cleanJsonString = (text: string): string => {
+      // 1. 移除所有 markdown 代碼塊標記（```json ... ``` 或 ``` ... ```）
+      let cleaned = text
+        .replace(/^[\s\n]*```(?:json)?[\s\n]*/i, '')
+        .replace(/[\s\n]*```[\s\n]*$/i, '')
+        .replace(/```(?:json)?[\s\n]*/gi, '');
+      
+      // 2. 移除控制字符（但保留常見的轉義字符）
+      cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+      
+      // 3. 找到 JSON 對象的開始和結束位置
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        // 提取 JSON 對象部分
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+      }
+      
+      // 4. 移除前後空白
+      cleaned = cleaned.trim();
+      
+      return cleaned;
+    };
+    
+    // 嘗試解析 JSON
+    let result;
+    try {
+      const cleanedContent = cleanJsonString(contentStr);
+      result = JSON.parse(cleanedContent);
+    } catch (parseError) {
+      // 如果解析失敗，嘗試提取 JSON 部分
+      try {
+        // 先移除 markdown 代碼塊
+        let cleanedResponse = contentStr
+          .replace(/^[\s\n]*```(?:json)?[\s\n]*/i, '')
+          .replace(/[\s\n]*```[\s\n]*$/i, '')
+          .replace(/```(?:json)?[\s\n]*/gi, '');
+        
+        // 找到 JSON 對象的範圍
+        const firstBrace = cleanedResponse.indexOf('{');
+        const lastBrace = cleanedResponse.lastIndexOf('}');
+        
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
+        }
+        
+        // 再次嘗試解析
+        result = JSON.parse(cleanedResponse);
+      } catch (extractError) {
+        console.error(`[HighlightService] JSON parsing failed. Content preview: ${contentStr.substring(0, 200)}`);
+        throw new Error(`無法解析 LLM 回應為 JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+      }
+    }
     const segments: HighlightSegment[] = [];
 
     // 估算每個對話的平均時長（假設每個字 0.3 秒）
