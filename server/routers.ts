@@ -360,8 +360,13 @@ export const appRouter = router({
             console.log(`[Highlight] 音檔 URL: ${audioUrl}`);
             console.log(`[Highlight] 開始時間: ${highlight.startTime}秒, 持續時間: ${highlight.duration}秒`);
             
+            // 驗證音檔 URL
+            if (!audioUrl || audioUrl.trim() === '') {
+              throw new Error(`音檔 URL 為空，無法剪輯精華片段`);
+            }
+            
             // 剪輯音訊
-            const { url, fileKey } = await clipFromUrlAndUpload(
+            const clipResult = await clipFromUrlAndUpload(
               audioUrl,
               highlight.startTime,
               highlight.duration,
@@ -369,7 +374,17 @@ export const appRouter = router({
               taskId
             );
             
-            console.log(`[Highlight] 剪輯完成: ${url}`);
+            // 驗證剪輯結果
+            if (!clipResult || !clipResult.url || clipResult.url.trim() === '') {
+              throw new Error(`音檔剪輯完成但 URL 為空`);
+            }
+            
+            if (!clipResult.fileKey || clipResult.fileKey.trim() === '') {
+              throw new Error(`音檔剪輯完成但 fileKey 為空`);
+            }
+            
+            console.log(`[Highlight] 剪輯完成: ${clipResult.url}`);
+            console.log(`[Highlight] File Key: ${clipResult.fileKey}`);
 
             // 儲存到資料庫
             const highlightId = await saveHighlight({
@@ -380,24 +395,27 @@ export const appRouter = router({
               startTime: highlight.startTime,
               endTime: highlight.endTime,
               duration: highlight.duration,
-              audioUrl: url,
-              audioFileKey: fileKey,
+              audioUrl: clipResult.url,
+              audioFileKey: clipResult.fileKey,
               transcript: highlight.transcript,
             });
             
-            console.log(`[Highlight] 儲存完成: ID=${highlightId}`);
+            console.log(`[Highlight] 儲存完成: ID=${highlightId}, audioUrl=${clipResult.url}`);
 
             results.push({
               id: highlightId,
               title: highlight.title,
               description: highlight.description,
-              audioUrl: url,
+              audioUrl: clipResult.url,
               duration: highlight.duration,
             });
           } catch (error) {
-            console.error(`[Highlight] 精華片段處理失敗: ${highlight.title}`, error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`[Highlight] 精華片段處理失敗: ${highlight.title}`, errorMessage);
+            console.error(`[Highlight] 錯誤詳情:`, error);
             // 音檔剪輯失敗，不儲存該精華片段，繼續處理下一個
             // 這樣可以確保所有儲存的精華片段都有音檔
+            // 但我們會記錄詳細的錯誤信息以便調試
           }
         }
 
