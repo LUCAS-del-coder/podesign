@@ -113,13 +113,29 @@ export default function History() {
         
         // **修復**：重新從資料庫獲取完整的精華片段數據（包含 audioUrl）
         // 這樣可以確保獲取到最新的數據，包括完整的 audioUrl
+        // 等待一小段時間確保資料庫已保存所有數據
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         try {
           const freshData = await utils.podcast.getHighlights.fetch({ taskId });
-          setTaskHighlights(prev => {
-            const newMap = new Map(prev);
-            newMap.set(taskId, freshData);
-            return newMap;
-          });
+          console.log(`[Highlight] 重新獲取到 ${freshData.length} 個精華片段`);
+          console.log(`[Highlight] 精華片段數據:`, freshData.map(h => ({ id: h.id, title: h.title, audioUrl: h.audioUrl ? '存在' : '缺失', duration: h.duration })));
+          
+          if (freshData.length > 0) {
+            setTaskHighlights(prev => {
+              const newMap = new Map(prev);
+              newMap.set(taskId, freshData);
+              return newMap;
+            });
+          } else {
+            console.warn(`[Highlight] 重新獲取時沒有找到精華片段，使用 mutation 返回的數據`);
+            // 如果重新獲取失敗，至少使用 mutation 返回的數據
+            setTaskHighlights(prev => {
+              const newMap = new Map(prev);
+              newMap.set(taskId, allHighlights);
+              return newMap;
+            });
+          }
         } catch (error) {
           console.error('重新獲取精華片段失敗:', error);
           // 如果重新獲取失敗，至少使用 mutation 返回的數據
@@ -502,8 +518,24 @@ export default function History() {
                                       </div>
                                     </div>
                                     {highlight.audioUrl ? (
-                                      <audio controls className="w-full h-8">
+                                      <audio 
+                                        controls 
+                                        className="w-full h-8"
+                                        onLoadedMetadata={(e) => {
+                                          // 當音檔元數據加載完成時，更新顯示的時長
+                                          const audio = e.currentTarget;
+                                          if (audio.duration) {
+                                            // 音檔已成功加載，時長會自動顯示
+                                            console.log(`[Audio] Loaded: ${highlight.title}, duration: ${audio.duration}s`);
+                                          }
+                                        }}
+                                        onError={(e) => {
+                                          console.error(`[Audio] Failed to load: ${highlight.title}`, e);
+                                          console.error(`[Audio] URL: ${highlight.audioUrl}`);
+                                        }}
+                                      >
                                         <source src={highlight.audioUrl} type="audio/mpeg" />
+                                        您的瀏覽器不支援音檔播放。
                                       </audio>
                                     ) : (
                                       <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
