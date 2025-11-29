@@ -220,9 +220,21 @@ export async function waitForPodcastCompletion(
     try {
       const episode = await getPodcastEpisode(episodeId);
       
-      // 記錄狀態變化
+      // 記錄狀態變化（使用適當的日誌級別）
       if (episode.processStatus !== lastStatus) {
-        console.log(`[ListenHub] Episode ${episodeId} status changed: ${lastStatus || 'unknown'} -> ${episode.processStatus}`);
+        if (episode.processStatus === "failed") {
+          // 失敗狀態使用 warn 級別（會顯示為黃色/橙色，而不是紅色錯誤）
+          const failInfo = episode.failCode 
+            ? ` (failCode: ${episode.failCode})`
+            : '';
+          console.warn(`[ListenHub] ⚠️  Episode ${episodeId} status changed: ${lastStatus || 'unknown'} -> ${episode.processStatus}${failInfo}`);
+        } else if (episode.processStatus === "success") {
+          // 成功狀態使用 info 級別
+          console.log(`[ListenHub] ✅ Episode ${episodeId} status changed: ${lastStatus || 'unknown'} -> ${episode.processStatus}`);
+        } else {
+          // 其他狀態使用 info 級別
+          console.log(`[ListenHub] ℹ️  Episode ${episodeId} status changed: ${lastStatus || 'unknown'} -> ${episode.processStatus}`);
+        }
         lastStatus = episode.processStatus;
       }
 
@@ -233,10 +245,19 @@ export async function waitForPodcastCompletion(
       }
 
       if (episode.processStatus === "failed") {
-        const errorMsg = episode.failCode 
-          ? `Episode generation failed with code: ${episode.failCode}`
-          : `Episode generation failed`;
-        console.error(`[ListenHub] ❌ ${errorMsg}`);
+        // 記錄詳細的失敗信息
+        const failInfo = episode.failCode 
+          ? ` (failCode: ${episode.failCode})`
+          : '';
+        const errorMsg = `Episode generation failed${failInfo}. This may be due to content issues, API limits, or temporary service problems.`;
+        
+        // 使用 warn 而不是 error，因為這可能是暫時的問題
+        console.warn(`[ListenHub] ⚠️  ${errorMsg}`);
+        
+        // 等待一小段時間後再拋出錯誤，給 ListenHub 一些時間可能恢復
+        // 但通常如果狀態已經是 failed，就不會再恢復了
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        
         throw new Error(errorMsg);
       }
 
@@ -260,9 +281,10 @@ export async function waitForPodcastCompletion(
       const elapsedMinutes = Math.floor(elapsedSeconds / 60);
       const remainingSeconds = elapsedSeconds % 60;
       
-      // 每 5 分鐘輸出一次詳細狀態
-      if (elapsedSeconds % 300 === 0 || consecutivePendingCount === 1) {
-        console.log(`[ListenHub] Episode ${episodeId} still processing... (${elapsedMinutes}m ${remainingSeconds}s elapsed, status: ${episode.processStatus}, checking again in ${pollInterval/1000}s)`);
+      // 每 5 分鐘輸出一次詳細狀態，或者狀態為 failed 時也輸出
+      if (elapsedSeconds % 300 === 0 || consecutivePendingCount === 1 || episode.processStatus === "failed") {
+        const statusEmoji = episode.processStatus === "failed" ? "⚠️" : episode.processStatus === "success" ? "✅" : "⏳";
+        console.log(`[ListenHub] ${statusEmoji} Episode ${episodeId} still processing... (${elapsedMinutes}m ${remainingSeconds}s elapsed, status: ${episode.processStatus}, checking again in ${pollInterval/1000}s)`);
       }
 
       await new Promise((resolve) => setTimeout(resolve, pollInterval));
