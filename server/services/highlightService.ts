@@ -126,7 +126,7 @@ ${fullTranscript}
     // 確保 content 是字串
     const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
     
-    // 清理和提取 JSON 的輔助函數（改進版，處理 markdown 代碼塊）
+    // 清理和提取 JSON 的輔助函數（改進版，處理 markdown 代碼塊和數組格式）
     const cleanJsonString = (text: string): string => {
       // 1. 移除所有 markdown 代碼塊標記（```json ... ``` 或 ``` ... ```）
       let cleaned = text
@@ -137,13 +137,28 @@ ${fullTranscript}
       // 2. 移除控制字符（但保留常見的轉義字符）
       cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
       
-      // 3. 找到 JSON 對象的開始和結束位置
+      // 3. 找到 JSON 的開始和結束位置（可能是對象 {} 或數組 []）
       const firstBrace = cleaned.indexOf('{');
+      const firstBracket = cleaned.indexOf('[');
       const lastBrace = cleaned.lastIndexOf('}');
+      const lastBracket = cleaned.lastIndexOf(']');
       
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        // 提取 JSON 對象部分
-        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+      // 確定是對象還是數組
+      let startPos = -1;
+      let endPos = -1;
+      
+      if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+        // 數組格式
+        startPos = firstBracket;
+        endPos = lastBracket;
+      } else if (firstBrace !== -1) {
+        // 對象格式
+        startPos = firstBrace;
+        endPos = lastBrace;
+      }
+      
+      if (startPos !== -1 && endPos !== -1 && endPos > startPos) {
+        cleaned = cleaned.substring(startPos, endPos + 1);
       }
       
       // 4. 移除前後空白
@@ -156,7 +171,23 @@ ${fullTranscript}
     let result;
     try {
       const cleanedContent = cleanJsonString(contentStr);
-      result = JSON.parse(cleanedContent);
+      const parsed = JSON.parse(cleanedContent);
+      
+      // **關鍵修復**：如果返回的是數組，自動包裝成 {segments: [...]} 格式
+      if (Array.isArray(parsed)) {
+        result = { segments: parsed };
+      } else if (parsed.segments && Array.isArray(parsed.segments)) {
+        // 已經是正確格式
+        result = parsed;
+      } else {
+        // 嘗試從對象中提取數組
+        const segments = parsed.segments || parsed.highlights || parsed.items || [];
+        if (Array.isArray(segments)) {
+          result = { segments };
+        } else {
+          throw new Error("LLM 回應格式不正確：找不到 segments 數組");
+        }
+      }
     } catch (parseError) {
       // 如果解析失敗，嘗試提取 JSON 部分
       try {
@@ -166,18 +197,40 @@ ${fullTranscript}
           .replace(/[\s\n]*```[\s\n]*$/i, '')
           .replace(/```(?:json)?[\s\n]*/gi, '');
         
-        // 找到 JSON 對象的範圍
+        // 找到 JSON 的範圍（可能是對象或數組）
         const firstBrace = cleanedResponse.indexOf('{');
+        const firstBracket = cleanedResponse.indexOf('[');
         const lastBrace = cleanedResponse.lastIndexOf('}');
+        const lastBracket = cleanedResponse.lastIndexOf(']');
         
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-          cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
+        let startPos = -1;
+        let endPos = -1;
+        
+        if (firstBracket !== -1 && (firstBrace === -1 || firstBracket < firstBrace)) {
+          startPos = firstBracket;
+          endPos = lastBracket;
+        } else if (firstBrace !== -1) {
+          startPos = firstBrace;
+          endPos = lastBrace;
+        }
+        
+        if (startPos !== -1 && endPos !== -1 && endPos > startPos) {
+          cleanedResponse = cleanedResponse.substring(startPos, endPos + 1);
         }
         
         // 再次嘗試解析
-        result = JSON.parse(cleanedResponse);
+        const parsed = JSON.parse(cleanedResponse);
+        
+        // 處理數組格式
+        if (Array.isArray(parsed)) {
+          result = { segments: parsed };
+        } else if (parsed.segments && Array.isArray(parsed.segments)) {
+          result = parsed;
+        } else {
+          throw new Error("LLM 回應格式不正確：找不到 segments 數組");
+        }
       } catch (extractError) {
-        console.error(`[HighlightService] JSON parsing failed. Content preview: ${contentStr.substring(0, 200)}`);
+        console.error(`[HighlightService] JSON parsing failed. Content preview: ${contentStr.substring(0, 500)}`);
         throw new Error(`無法解析 LLM 回應為 JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
       }
     }
