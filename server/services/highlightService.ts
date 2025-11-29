@@ -334,17 +334,24 @@ ${fullTranscript}
       
       // **關鍵改進**：強制使用目標時長（如果估算值在合理範圍內）
       // 這樣可以確保實際剪輯的音檔長度符合目標
-      if (estimatedDuration >= targetDuration * 0.7 && estimatedDuration <= MAX_HIGHLIGHT_DURATION) {
+      // 對於60秒的精華片段，允許使用60秒（不截斷）
+      const maxAllowedDuration = targetDuration === 60 ? 60 : MAX_HIGHLIGHT_DURATION;
+      
+      if (estimatedDuration >= targetDuration * 0.7 && estimatedDuration <= maxAllowedDuration) {
         // 如果估算值在合理範圍內，使用目標時長
-        estimatedDuration = Math.min(targetDuration, MAX_HIGHLIGHT_DURATION);
-        console.log(`[HighlightService] Using target duration: ${estimatedDuration}s (target: ${targetDuration}s)`);
+        estimatedDuration = Math.min(targetDuration, maxAllowedDuration);
+        console.log(`[HighlightService] Using target duration: ${estimatedDuration}s (target: ${targetDuration}s, maxAllowed: ${maxAllowedDuration}s)`);
+      } else if (estimatedDuration < targetDuration * 0.7) {
+        // 如果估算值太小，至少使用目標時長的70%（但不能超過限制）
+        estimatedDuration = Math.min(Math.max(estimatedDuration, Math.floor(targetDuration * 0.7)), maxAllowedDuration);
+        console.log(`[HighlightService] Estimated duration too small, using minimum: ${estimatedDuration}s (target: ${targetDuration}s)`);
       }
       
-      // 限制精華片段最多 59 秒（Kling AI API 要求 2-60 秒，留出安全邊界）
-      // 重要：必須同時調整 duration 和 endTime，確保實際剪輯的音訊也不超過 59 秒
-      if (estimatedDuration > MAX_HIGHLIGHT_DURATION) {
-        console.warn(`[HighlightService] Highlight duration (${estimatedDuration}s) exceeds limit (${MAX_HIGHLIGHT_DURATION}s), truncating`);
-        estimatedDuration = MAX_HIGHLIGHT_DURATION;
+      // 限制精華片段最多 maxAllowedDuration 秒
+      // 對於60秒的精華片段，允許使用60秒；其他情況使用59秒
+      if (estimatedDuration > maxAllowedDuration) {
+        console.warn(`[HighlightService] Highlight duration (${estimatedDuration}s) exceeds limit (${maxAllowedDuration}s), truncating`);
+        estimatedDuration = maxAllowedDuration;
       }
       
       // **改進**：如果估算時長遠小於目標時長，記錄警告
