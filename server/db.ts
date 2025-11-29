@@ -34,8 +34,7 @@ function createConnectionPool(): mysql.Pool {
     keepAliveInitialDelay: 0,
     // 連接超時設定
     connectTimeout: 10000, // 10 秒
-    // 自動重連設定
-    reconnect: true,
+    // 注意：MySQL2 不支援 reconnect 選項，我們使用手動重連機制（handleReconnect）
   });
 
   // 監聽連接錯誤
