@@ -44,10 +44,11 @@ export async function identifyHighlights(
   const prompt = `你是一位專業的 Podcast 編輯，擅長從完整的 Podcast 中找出最精彩的片段。
 
 **重要要求**：
-- 你必須只找出 **1 個**最精彩的片段，長度約 ${targetDuration} 秒（不能多也不能少）
+- 你必須只找出 **1 個**最精彩的片段，長度必須**精確約 ${targetDuration} 秒**（允許 ±3 秒誤差，但必須接近 ${targetDuration} 秒）
 - 所有回應必須使用**繁體中文**，包括標題、描述和理由
 - 你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）
 - **重要**：每次調用時，你必須選擇**不同的**精彩片段，不要重複選擇相同的 startIndex 和 endIndex
+- **關鍵**：你選擇的片段長度必須接近 ${targetDuration} 秒。如果文字稿中沒有足夠長的單一片段，你可以選擇多個連續的對話（增加 endIndex - startIndex 的差值）來達到約 ${targetDuration} 秒的長度
 
 精華片段的標準：
 1. **高潮時刻**：討論最激烈、最有趣的部分
@@ -74,10 +75,17 @@ ${fullTranscript}
 **重要**：segments 數組必須包含且僅包含 1 個對象。
 
 重要限制：
-- **只返回 1 個片段**，長度約 ${targetDuration} 秒（允許 ±5 秒誤差）
+- **只返回 1 個片段**，長度必須**精確約 ${targetDuration} 秒**（允許 ±3 秒誤差）
 - **每個精華片段的長度不能超過 60 秒**
 - 每個片段應該是完整的對話片段，不要在句子中間切斷
 - 優先選擇最精彩的部分
+
+**時長計算說明**：
+- 假設每個中文字符約 0.3 秒
+- 要達到 ${targetDuration} 秒，需要約 ${Math.ceil(targetDuration / 0.3)} 個字符
+- 請根據文字稿的字符數來選擇合適的 startIndex 和 endIndex
+- 如果單個對話不夠長，請選擇多個連續的對話（增加 endIndex - startIndex 的差值）
+- **重要**：確保選擇的片段字符數足夠達到 ${targetDuration} 秒的長度
 
 **重要**：你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）。
 **重要**：所有文字內容必須使用繁體中文。
@@ -295,11 +303,47 @@ ${fullTranscript}
       const charCount = transcript.length;
       let estimatedDuration = Math.ceil(charCount * avgSecondsPerChar);
       
+      // **改進**：如果估算的時長遠小於目標時長，嘗試擴展片段
+      // 計算需要多少字符才能達到目標時長
+      const targetChars = Math.ceil(targetDuration / avgSecondsPerChar);
+      if (charCount < targetChars * 0.7) {
+        // 如果當前片段太短（小於目標的70%），嘗試擴展
+        const neededChars = targetChars - charCount;
+        const additionalScripts = Math.ceil(neededChars / 100); // 假設每個對話約100字符
+        
+        // 嘗試向後擴展
+        let extendedEndIndex = endIndex;
+        let extendedScripts = scripts.slice(startIndex, extendedEndIndex + 1);
+        let extendedCharCount = extendedScripts.reduce((sum, s) => sum + s.content.length, 0);
+        
+        while (extendedCharCount < targetChars && extendedEndIndex < scripts.length - 1) {
+          extendedEndIndex++;
+          extendedScripts = scripts.slice(startIndex, extendedEndIndex + 1);
+          extendedCharCount = extendedScripts.reduce((sum, s) => sum + s.content.length, 0);
+        }
+        
+        // 如果擴展後更接近目標，使用擴展後的片段
+        if (Math.abs(extendedCharCount - targetChars) < Math.abs(charCount - targetChars)) {
+          const extendedTranscript = extendedScripts
+            .map((s) => `${s.speakerName}: ${s.content}`)
+            .join("\n");
+          transcript = extendedTranscript;
+          estimatedDuration = Math.ceil(extendedCharCount * avgSecondsPerChar);
+          // 更新 endIndex（但這裡我們不能修改 segment，所以只在日誌中記錄）
+          console.log(`[HighlightService] Extended segment from ${endIndex} to ${extendedEndIndex} to reach target duration`);
+        }
+      }
+      
       // 限制精華片段最多 59 秒（Kling AI API 要求 2-60 秒，留出安全邊界）
       // 重要：必須同時調整 duration 和 endTime，確保實際剪輯的音訊也不超過 59 秒
       if (estimatedDuration > MAX_HIGHLIGHT_DURATION) {
         console.warn(`[HighlightService] Highlight duration (${estimatedDuration}s) exceeds limit (${MAX_HIGHLIGHT_DURATION}s), truncating`);
         estimatedDuration = MAX_HIGHLIGHT_DURATION;
+      }
+      
+      // **改進**：如果估算時長遠小於目標時長，記錄警告
+      if (estimatedDuration < targetDuration * 0.7) {
+        console.warn(`[HighlightService] Estimated duration (${estimatedDuration}s) is much less than target (${targetDuration}s). Selected segment may be too short.`);
       }
       
       // endTime 必須基於截斷後的 duration 計算，確保實際音訊長度不超過 60 秒
