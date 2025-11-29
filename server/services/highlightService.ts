@@ -303,35 +303,41 @@ ${fullTranscript}
       const charCount = transcript.length;
       let estimatedDuration = Math.ceil(charCount * avgSecondsPerChar);
       
-      // **改進**：如果估算的時長遠小於目標時長，嘗試擴展片段
+      // **改進**：如果估算的時長遠小於目標時長，自動擴展片段
       // 計算需要多少字符才能達到目標時長
       const targetChars = Math.ceil(targetDuration / avgSecondsPerChar);
-      if (charCount < targetChars * 0.7) {
-        // 如果當前片段太短（小於目標的70%），嘗試擴展
-        const neededChars = targetChars - charCount;
-        const additionalScripts = Math.ceil(neededChars / 100); // 假設每個對話約100字符
+      
+      // 如果當前片段太短，自動擴展
+      if (charCount < targetChars * 0.8) {
+        console.log(`[HighlightService] Segment too short (${charCount} chars, target: ${targetChars} chars). Extending...`);
         
         // 嘗試向後擴展
         let extendedEndIndex = endIndex;
         let extendedScripts = scripts.slice(startIndex, extendedEndIndex + 1);
         let extendedCharCount = extendedScripts.reduce((sum, s) => sum + s.content.length, 0);
         
+        // 擴展直到達到目標字符數或到達文字稿末尾
         while (extendedCharCount < targetChars && extendedEndIndex < scripts.length - 1) {
           extendedEndIndex++;
           extendedScripts = scripts.slice(startIndex, extendedEndIndex + 1);
           extendedCharCount = extendedScripts.reduce((sum, s) => sum + s.content.length, 0);
         }
         
-        // 如果擴展後更接近目標，使用擴展後的片段
-        if (Math.abs(extendedCharCount - targetChars) < Math.abs(charCount - targetChars)) {
-          const extendedTranscript = extendedScripts
-            .map((s) => `${s.speakerName}: ${s.content}`)
-            .join("\n");
-          transcript = extendedTranscript;
-          estimatedDuration = Math.ceil(extendedCharCount * avgSecondsPerChar);
-          // 更新 endIndex（但這裡我們不能修改 segment，所以只在日誌中記錄）
-          console.log(`[HighlightService] Extended segment from ${endIndex} to ${extendedEndIndex} to reach target duration`);
-        }
+        // 使用擴展後的片段
+        const extendedTranscript = extendedScripts
+          .map((s) => `${s.speakerName}: ${s.content}`)
+          .join("\n");
+        transcript = extendedTranscript;
+        estimatedDuration = Math.ceil(extendedCharCount * avgSecondsPerChar);
+        console.log(`[HighlightService] Extended segment from index ${endIndex} to ${extendedEndIndex} (${charCount} -> ${extendedCharCount} chars, ${Math.ceil(charCount * avgSecondsPerChar)}s -> ${estimatedDuration}s)`);
+      }
+      
+      // **關鍵改進**：強制使用目標時長（如果估算值在合理範圍內）
+      // 這樣可以確保實際剪輯的音檔長度符合目標
+      if (estimatedDuration >= targetDuration * 0.7 && estimatedDuration <= MAX_HIGHLIGHT_DURATION) {
+        // 如果估算值在合理範圍內，使用目標時長
+        estimatedDuration = Math.min(targetDuration, MAX_HIGHLIGHT_DURATION);
+        console.log(`[HighlightService] Using target duration: ${estimatedDuration}s (target: ${targetDuration}s)`);
       }
       
       // 限制精華片段最多 59 秒（Kling AI API 要求 2-60 秒，留出安全邊界）
