@@ -361,10 +361,13 @@ export async function analyzePodcastContent(transcription: string): Promise<{
   podcastScript: string;
 }> {
   try {
-    // 簡化提示詞以提高處理速度
+    // 簡化提示詞以提高處理速度，明確要求純 JSON（不使用 markdown）
     const systemPrompt = `你是專業的 Podcast 編輯。將逐字稿轉為繁體中文 Podcast 內容。
 
-輸出 JSON：{"summary": "200-300字摘要", "podcastScript": "第三人稱腳本（含 intro、主要內容、outro）"}`;
+**重要**：你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）。
+
+輸出格式（直接返回，不要包裝在代碼塊中）：
+{"summary": "200-300字摘要", "podcastScript": "第三人稱腳本（含 intro、主要內容、outro）"}`;
 
     // 如果逐字稿太長，只取前 8000 字元以加快處理
     const maxLength = 8000;
@@ -393,15 +396,32 @@ ${truncatedTranscription}`;
     // content 可能是 string 或 array，需要處理
     const contentStr = typeof content === "string" ? content : JSON.stringify(content);
     
-    // 清理和提取 JSON 的輔助函數
+    // 清理和提取 JSON 的輔助函數（改進版）
     const cleanJsonString = (text: string): string => {
-      // 1. 移除 markdown 代碼塊標記（```json ... ``` 或 ``` ... ```）
-      let cleaned = text.replace(/^```(?:json)?\s*\n?/gm, '').replace(/\n?```\s*$/gm, '');
+      // 1. 移除所有 markdown 代碼塊標記（```json ... ``` 或 ``` ... ```）
+      // 處理多種情況：開頭、結尾、中間
+      let cleaned = text
+        // 移除開頭的 ```json 或 ```
+        .replace(/^[\s\n]*```(?:json)?[\s\n]*/i, '')
+        // 移除結尾的 ```
+        .replace(/[\s\n]*```[\s\n]*$/i, '')
+        // 移除中間的 ```json 或 ```（如果有的話）
+        .replace(/```(?:json)?[\s\n]*/gi, '');
       
       // 2. 移除控制字符（但保留換行符和空格，因為它們可能在 JSON 字符串值中）
+      // 注意：保留 \n, \r, \t 等常見的轉義字符
       cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
       
-      // 3. 移除前後空白
+      // 3. 嘗試找到 JSON 對象的開始和結束位置
+      const firstBrace = cleaned.indexOf('{');
+      const lastBrace = cleaned.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        // 提取 JSON 對象部分
+        cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+      }
+      
+      // 4. 移除前後空白
       cleaned = cleaned.trim();
       
       return cleaned;
@@ -511,8 +531,9 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
 1. 你必須分析指定的 YouTube 影片，不能分析其他影片
 2. 你必須在回應中包含正確的 videoId
 3. 你必須返回該影片的實際標題和內容
+4. **重要**：你必須直接返回純 JSON 格式，不要使用 markdown 代碼塊（不要使用 \`\`\`json 或 \`\`\`）
 
-輸出 JSON 格式（必須包含所有欄位）：
+輸出格式（直接返回，不要包裝在代碼塊中）：
 {
   "videoId": "${videoId}",
   "title": "影片標題（必須是這個影片的實際標題）",
@@ -524,7 +545,8 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
 **驗證要求**：
 - videoId 欄位必須是 "${videoId}"（不能是其他值）
 - title 必須是這個影片的實際標題
-- 內容必須與這個影片完全匹配`;
+- 內容必須與這個影片完全匹配
+- 回應必須是純 JSON，不要使用 markdown 代碼塊`;
 
   const userPrompt = `請分析以下這個特定的 YouTube 影片並生成繁體中文 Podcast 內容。
 
@@ -574,17 +596,32 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
         throw new Error("Gemini 未返回內容");
       }
 
-      // 解析 JSON 回應（清理 markdown 代碼塊和控制字符）
+      // 解析 JSON 回應（改進的清理邏輯）
       let result;
       try {
-        // 1. 移除 markdown 代碼塊標記（```json ... ``` 或 ``` ... ```）
-        let cleanedText = responseText.replace(/^```(?:json)?\s*\n?/gm, '').replace(/\n?```\s*$/gm, '');
+        // 改進的 JSON 清理函數
+        const cleanJsonResponse = (text: string): string => {
+          // 1. 移除所有 markdown 代碼塊標記
+          let cleaned = text
+            .replace(/^[\s\n]*```(?:json)?[\s\n]*/i, '')
+            .replace(/[\s\n]*```[\s\n]*$/i, '')
+            .replace(/```(?:json)?[\s\n]*/gi, '');
+          
+          // 2. 移除控制字符（但保留常見的轉義字符）
+          cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+          
+          // 3. 找到 JSON 對象的開始和結束位置
+          const firstBrace = cleaned.indexOf('{');
+          const lastBrace = cleaned.lastIndexOf('}');
+          
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+          }
+          
+          return cleaned.trim();
+        };
         
-        // 2. 清理控制字符（但保留換行符，因為 JSON 可能跨多行）
-        cleanedText = cleanedText
-          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '') // 移除壞的控制字符
-          .trim();
-        
+        const cleanedText = cleanJsonResponse(responseText);
         result = JSON.parse(cleanedText);
       } catch (parseError) {
         // 如果解析失敗，嘗試提取 JSON 部分
@@ -604,30 +641,50 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
           }
         } catch (extractError) {
           console.warn(`[YouTube] JSON 解析失敗，嘗試手動提取欄位:`, parseError);
-          // 最後嘗試：手動提取關鍵欄位（處理多行字符串值）
-          const videoIdMatch = responseText.match(/"videoId"\s*:\s*"([^"]+)"/);
-          const titleMatch = responseText.match(/"title"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
-          const summaryMatch = responseText.match(/"summary"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
-          const scriptMatch = responseText.match(/"podcastScript"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
           
-          if (summaryMatch && scriptMatch) {
-            // 解碼轉義字符
-            const decodeString = (str: string) => {
-              return str
-                .replace(/\\n/g, '\n')
-                .replace(/\\"/g, '"')
-                .replace(/\\\\/g, '\\');
-            };
+          // 改進的清理邏輯：先徹底清理 markdown
+          let cleanedResponse = responseText
+            .replace(/^[\s\n]*```(?:json)?[\s\n]*/i, '')
+            .replace(/[\s\n]*```[\s\n]*$/i, '')
+            .replace(/```(?:json)?[\s\n]*/gi, '');
+          
+          // 找到 JSON 對象的範圍
+          const firstBrace = cleanedResponse.indexOf('{');
+          const lastBrace = cleanedResponse.lastIndexOf('}');
+          
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            cleanedResponse = cleanedResponse.substring(firstBrace, lastBrace + 1);
+          }
+          
+          // 再次嘗試解析
+          try {
+            result = JSON.parse(cleanedResponse);
+          } catch (secondParseError) {
+            // 最後嘗試：手動提取關鍵欄位（處理多行字符串值）
+            const videoIdMatch = cleanedResponse.match(/"videoId"\s*:\s*"([^"]+)"/);
+            const titleMatch = cleanedResponse.match(/"title"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
+            const summaryMatch = cleanedResponse.match(/"summary"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
+            const scriptMatch = cleanedResponse.match(/"podcastScript"\s*:\s*"((?:[^"\\]|\\.|\\n)*)"/s);
             
-            result = {
-              videoId: videoIdMatch ? videoIdMatch[1] : undefined,
-              title: titleMatch ? decodeString(titleMatch[1]) : undefined,
-              transcription: summaryMatch ? decodeString(summaryMatch[1]) : undefined,
-              summary: decodeString(summaryMatch[1]),
-              podcastScript: decodeString(scriptMatch[1]),
-            };
-          } else {
-            throw new Error(`無法解析 Gemini 回應為 JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+            if (summaryMatch && scriptMatch) {
+              // 解碼轉義字符
+              const decodeString = (str: string) => {
+                return str
+                  .replace(/\\n/g, '\n')
+                  .replace(/\\"/g, '"')
+                  .replace(/\\\\/g, '\\');
+              };
+              
+              result = {
+                videoId: videoIdMatch ? videoIdMatch[1] : undefined,
+                title: titleMatch ? decodeString(titleMatch[1]) : undefined,
+                transcription: summaryMatch ? decodeString(summaryMatch[1]) : undefined,
+                summary: decodeString(summaryMatch[1]),
+                podcastScript: decodeString(scriptMatch[1]),
+              };
+            } else {
+              throw new Error(`無法解析 Gemini 回應為 JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+            }
           }
         }
       }
