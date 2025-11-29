@@ -16,7 +16,22 @@ export const appRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      // 徹底清除 cookie，使用多種方式確保清除成功
+      ctx.res.clearCookie(COOKIE_NAME, { 
+        ...cookieOptions, 
+        maxAge: 0, // 使用 0 而不是 -1，更可靠
+        expires: new Date(0), // 明確設定過期時間
+      });
+      // 也嘗試清除可能存在的舊格式 cookie
+      ctx.res.clearCookie(COOKIE_NAME, { 
+        path: "/",
+        httpOnly: true,
+        secure: cookieOptions.secure,
+        sameSite: cookieOptions.sameSite,
+        maxAge: 0,
+        expires: new Date(0),
+      });
+      console.log("[Auth] User logged out, cookie cleared");
       return {
         success: true,
       } as const;

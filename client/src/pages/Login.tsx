@@ -167,7 +167,20 @@ export default function Login() {
             {/* Google 登入按鈕 */}
             <Button
               type="button"
-              onClick={() => {
+              onClick={async () => {
+                // 先清除可能存在的舊 cookie（確保切換帳號時清除舊 session）
+                try {
+                  // 嘗試調用登出 API 清除 cookie
+                  await fetch("/api/trpc/auth.logout", {
+                    method: "POST",
+                    credentials: "include",
+                  }).catch(() => {
+                    // 忽略錯誤，繼續進行 OAuth
+                  });
+                } catch (error) {
+                  // 忽略錯誤，繼續進行 OAuth
+                }
+                // 跳轉到 Google OAuth
                 window.location.href = "/api/oauth/google";
               }}
               className="w-full h-12 bg-white hover:bg-gray-50 text-gray-700 font-medium shadow-md hover:shadow-lg transition-all duration-200 border border-gray-300"

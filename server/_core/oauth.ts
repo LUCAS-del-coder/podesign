@@ -46,6 +46,7 @@ export function registerOAuthRoutes(app: Express) {
       }
 
       // 儲存或更新用戶資訊到資料庫
+      const existingUser = await db.getUserByOpenId(userInfo.id);
       await db.upsertUser({
         openId: userInfo.id, // 使用 Google ID 作為 openId
         name: userInfo.name || null,
@@ -67,6 +68,9 @@ export function registerOAuthRoutes(app: Express) {
         secure: cookieOptions.secure,
         sameSite: cookieOptions.sameSite,
         path: cookieOptions.path,
+        hostname: req.hostname,
+        protocol: req.protocol,
+        forwardedProto: req.headers["x-forwarded-proto"],
       });
       
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
@@ -75,6 +79,8 @@ export function registerOAuthRoutes(app: Express) {
         openId: userInfo.id,
         name: userInfo.name,
         email: userInfo.email,
+        isNewUser: !existingUser,
+        userId: existingUser?.id || "new",
       });
 
       res.redirect(302, "/");

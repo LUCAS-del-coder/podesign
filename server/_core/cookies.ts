@@ -40,10 +40,15 @@ export function getSessionCookieOptions(
   // 如果需要跨子網域，可以設定 domain
   const domain = undefined; // Railway 通常不需要設定 domain
 
+  // 改進 cookie 設定以支援跨設備和跨帳號
+  // sameSite: "lax" 在大多數情況下更可靠，特別是對於手機瀏覽器
+  // 如果確實需要跨站點，可以使用 "none"，但必須配合 secure: true
+  const sameSiteValue: "lax" | "strict" | "none" = isSecure ? "lax" : "lax";
+  
   return {
     httpOnly: true,
     path: "/",
-    sameSite: isSecure ? "none" : "lax", // 生產環境用 none，開發環境用 lax
+    sameSite: sameSiteValue,
     secure: isSecure, // Railway 上應該是 true
     ...(domain && { domain }),
   };

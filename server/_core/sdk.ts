@@ -118,8 +118,33 @@ class SDKServer {
 
     // 如果用戶不在資料庫中（Google OAuth 新用戶），需要從 session 中取得資訊
     if (!user) {
-      console.warn("[Auth] User not found in DB but session exists:", sessionUserId);
-      throw ForbiddenError("User not found in database");
+      console.warn("[Auth] User not found in DB but session exists:", {
+        openId: sessionUserId,
+        sessionName: session.name,
+        timestamp: new Date().toISOString(),
+      });
+      // 嘗試從 session 中創建用戶（如果 session 中有足夠資訊）
+      if (session.name) {
+        console.log("[Auth] Attempting to create user from session data");
+        try {
+          await db.upsertUser({
+            openId: sessionUserId,
+            name: session.name,
+            loginMethod: "google",
+            lastSignedIn: signedInAt,
+          });
+          user = await db.getUserByOpenId(sessionUserId);
+          if (user) {
+            console.log("[Auth] User created from session data:", user.id);
+          }
+        } catch (error) {
+          console.error("[Auth] Failed to create user from session:", error);
+        }
+      }
+      
+      if (!user) {
+        throw ForbiddenError("User not found in database");
+      }
     }
 
     // 只在開發環境或首次認證時輸出日誌，避免輪詢時產生大量日誌
