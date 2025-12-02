@@ -761,6 +761,8 @@ async function processPodcastTask(
     let processedOutroText = outroText ? replaceTemplateVariables(outroText, templateVars) : undefined;
 
     // 生成開場音訊（如果有提供開場文字）
+    // 注意：開場和結尾應該直接讀出文字，而不是轉換成對話
+    // 將文字包裝成明確的單人敘述格式，讓 ListenHub 知道這只是要讀出的文字
     let introEpisode: { audioUrl?: string } | null = null;
     if (processedIntroText) {
       console.log(`[Task ${taskId}] Generating intro audio...`);
@@ -771,12 +773,19 @@ async function processPodcastTask(
         message: '正在生成開場音訊...',
       });
       try {
-        introEpisode = await generateChinesePodcast(processedIntroText, 'quick', customVoices);
+        // 將開場文字包裝成明確的單人敘述格式
+        // 使用"主持人說："的格式，讓 ListenHub 知道這只是要讀出的文字，不要轉換成對話
+        const introContent = `主持人說：${processedIntroText}。`;
+        // 使用單一 speaker（只使用第一個聲音）來生成開場
+        const introVoices = customVoices 
+          ? { host1: customVoices.host1, host2: customVoices.host1 } // 使用同一個聲音
+          : undefined;
+        introEpisode = await generateChinesePodcast(introContent, 'quick', introVoices);
         console.log(`[Task ${taskId}] Intro audio generated: ${introEpisode.audioUrl}`);
       } catch (error) {
         console.error(`[Task ${taskId}] Failed to generate intro audio:`, error);
         // 如果開場生成失敗，繼續處理主要內容，但不使用開場
-        processedIntroText = undefined;
+        introEpisode = null;
       }
     }
 
@@ -810,6 +819,8 @@ async function processPodcastTask(
     console.log(`[Task ${taskId}] Main podcast generated: ${podcastEpisode.audioUrl}`);
 
     // 生成結尾音訊（如果有提供結尾文字）
+    // 注意：結尾應該直接讀出文字，而不是轉換成對話
+    // 將文字包裝成明確的單人敘述格式，讓 ListenHub 知道這只是要讀出的文字
     let outroEpisode: { audioUrl?: string } | null = null;
     if (processedOutroText) {
       console.log(`[Task ${taskId}] Generating outro audio...`);
@@ -820,7 +831,14 @@ async function processPodcastTask(
         message: '正在生成結尾音訊...',
       });
       try {
-        outroEpisode = await generateChinesePodcast(processedOutroText, 'quick', customVoices);
+        // 將結尾文字包裝成明確的單人敘述格式
+        // 使用"主持人說："的格式，讓 ListenHub 知道這只是要讀出的文字，不要轉換成對話
+        const outroContent = `主持人說：${processedOutroText}。`;
+        // 使用單一 speaker（只使用第一個聲音）來生成結尾
+        const outroVoices = customVoices 
+          ? { host1: customVoices.host1, host2: customVoices.host1 } // 使用同一個聲音
+          : undefined;
+        outroEpisode = await generateChinesePodcast(outroContent, 'quick', outroVoices);
         console.log(`[Task ${taskId}] Outro audio generated: ${outroEpisode.audioUrl}`);
       } catch (error) {
         console.error(`[Task ${taskId}] Failed to generate outro audio:`, error);
