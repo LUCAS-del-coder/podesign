@@ -177,21 +177,34 @@ export async function mergePodcastAudio(
 ): Promise<string> {
   const segments: AudioSegment[] = [];
 
+  console.log(`[AudioMerge] mergePodcastAudio called with:`);
+  console.log(`[AudioMerge] - introUrl: ${introUrl || 'undefined'}`);
+  console.log(`[AudioMerge] - mainUrl: ${mainUrl || 'undefined'}`);
+  console.log(`[AudioMerge] - outroUrl: ${outroUrl || 'undefined'}`);
+
   if (introUrl) {
+    console.log(`[AudioMerge] Adding intro segment: ${introUrl}`);
     segments.push({ url: introUrl });
   }
 
   if (mainUrl) {
+    console.log(`[AudioMerge] Adding main segment: ${mainUrl}`);
     segments.push({ url: mainUrl });
+  } else {
+    throw new Error("Main audio URL is required");
   }
 
   if (outroUrl) {
+    console.log(`[AudioMerge] Adding outro segment: ${outroUrl}`);
     segments.push({ url: outroUrl });
   }
 
   if (segments.length === 0) {
     throw new Error("No audio segments to merge");
   }
+
+  console.log(`[AudioMerge] Total segments to merge: ${segments.length}`);
+  console.log(`[AudioMerge] Segment order: ${segments.map((s, i) => `${i + 1}. ${s.url ? 'URL' : 'local'}`).join(' → ')}`);
 
   return await mergeAudioSegments(segments);
 }

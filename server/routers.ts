@@ -852,6 +852,12 @@ async function processPodcastTask(
     const hasIntro = introEpisode?.audioUrl;
     const hasOutro = outroEpisode?.audioUrl;
     
+    // 詳細日誌：確認開場和結尾的狀態
+    console.log(`[Task ${taskId}] Audio segments status:`);
+    console.log(`[Task ${taskId}] - Intro: ${hasIntro ? `✅ ${introEpisode?.audioUrl}` : '❌ Not generated'}`);
+    console.log(`[Task ${taskId}] - Main: ✅ ${podcastEpisode.audioUrl}`);
+    console.log(`[Task ${taskId}] - Outro: ${hasOutro ? `✅ ${outroEpisode?.audioUrl}` : '❌ Not generated'}`);
+    
     if (hasIntro || hasOutro) {
       console.log(`[Task ${taskId}] Merging audio segments...`);
       await updateProgress({
@@ -866,12 +872,19 @@ async function processPodcastTask(
         const { storagePut } = await import('./storage');
         const fs = await import('fs/promises');
 
+        console.log(`[Task ${taskId}] Calling mergePodcastAudio with:`);
+        console.log(`[Task ${taskId}] - introUrl: ${hasIntro ? introEpisode?.audioUrl : 'null'}`);
+        console.log(`[Task ${taskId}] - mainUrl: ${podcastEpisode.audioUrl}`);
+        console.log(`[Task ${taskId}] - outroUrl: ${hasOutro ? outroEpisode?.audioUrl : 'null'}`);
+
         // 合併音訊
         const mergedAudioPath = await mergePodcastAudio(
           introEpisode?.audioUrl,
           podcastEpisode.audioUrl,
           outroEpisode?.audioUrl
         );
+        
+        console.log(`[Task ${taskId}] ✅ Audio merged successfully: ${mergedAudioPath}`);
 
         // 讀取合併後的音訊檔案
         const mergedAudioBuffer = await fs.readFile(mergedAudioPath);
