@@ -448,18 +448,14 @@ export default function Home() {
                   <Label htmlFor="intro-text">開場白文字（選填）</Label>
                   <Textarea
                     id="intro-text"
-                    placeholder="例如：歡迎收聽 {date} 的節目，今天我們要討論 {topic}。支援變數：{date}、{topic}、{title}、{duration}"
+                    placeholder="例如：歡迎收聽今天的節目！"
                     value={introText}
                     onChange={(e) => setIntroText(e.target.value)}
                     rows={3}
                     className="resize-none"
                   />
                   <p className="text-xs text-muted-foreground">
-                    開場白將在主要內容之前播放。可使用變數：{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{date}`}</code>、{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{topic}`}</code>、{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{title}`}</code>、{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{duration}`}</code>
+                    開場白將在主要內容之前播放
                   </p>
                 </div>
 
@@ -474,11 +470,7 @@ export default function Home() {
                     className="resize-none"
                   />
                   <p className="text-xs text-muted-foreground">
-                    結尾語將在主要內容之後播放。可使用變數：{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{date}`}</code>、{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{topic}`}</code>、{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{title}`}</code>、{" "}
-                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{duration}`}</code>
+                    結尾語將在主要內容之後播放
                   </p>
                 </div>
               </div>
