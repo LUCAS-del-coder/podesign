@@ -615,17 +615,20 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
 **影片長度**：${actualDuration} 秒
 
 **嚴格要求**：
-1. 你必須分析這個特定的影片（Video ID: ${videoId}）
+1. 你必須分析這個特定的影片（Video ID: ${videoId}），不能分析其他影片
 2. 回應中的 videoId 必須完全匹配 "${videoId}"（不能有任何差異）
 3. 回應中的 title 必須完全匹配 "${actualTitle}"（不能有任何差異）
 4. 如果無法訪問這個影片或標題不匹配，請明確說明，不要返回其他影片的內容
 5. 你必須觀看這個特定的 URL：${youtubeUrl}
+6. **重要**：summary 欄位必須是 200-300 字的精華摘要，不要超過 500 字
+7. **重要**：transcription 欄位必須是這個影片的主要內容摘要（500-1000字），不能包含其他影片的內容
 
 **驗證步驟**：
 - 確認你分析的影片 Video ID 是 ${videoId}
 - 確認你分析的影片標題是 "${actualTitle}"
 - 只有當這兩個都匹配時，才返回分析結果
 - 如果不匹配，請在回應中明確說明無法訪問或標題不匹配
+- 確保返回的內容只與這個影片相關，不包含其他影片的內容
 
 請直接觀看這個影片的內容並以 JSON 格式回應。`;
 
@@ -760,6 +763,18 @@ async function analyzeYoutubeUrlDirectly(youtubeUrl: string): Promise<{
       // 驗證結果格式
       if (!result.summary || !result.podcastScript) {
         throw new Error("Gemini 回應格式不正確，缺少必要欄位");
+      }
+
+      // 驗證 summary 長度（避免過長導致 podcast 過長）
+      const summaryLength = result.summary.length;
+      if (summaryLength > 1500) {
+        console.warn(`[YouTube] ⚠️  Summary too long (${summaryLength} chars), truncating to 1200 chars`);
+        result.summary = result.summary.substring(0, 1200) + '...';
+      }
+      
+      // 驗證 summary 內容是否合理（至少 50 字）
+      if (result.summary.length < 50) {
+        console.warn(`[YouTube] ⚠️  Summary too short (${result.summary.length} chars), may indicate incorrect content`);
       }
 
       // 嚴格驗證：檢查返回的 videoId 是否匹配

@@ -780,6 +780,22 @@ async function processPodcastTask(
       }
     }
 
+    // 限制 summary 長度，根據模式控制（避免生成過長的 podcast）
+    let processedSummary = result.summary;
+    const summaryLengthLimits = {
+      quick: 500,   // 4-5 分鐘對應約 500 字
+      medium: 800,  // 7-8 分鐘對應約 800 字
+      deep: 1200,  // 10-12 分鐘對應約 1200 字
+    };
+    const maxLength = summaryLengthLimits[mode] || summaryLengthLimits.medium;
+    
+    if (processedSummary.length > maxLength) {
+      console.log(`[Task ${taskId}] Summary too long (${processedSummary.length} chars), truncating to ${maxLength} chars for ${mode} mode`);
+      processedSummary = processedSummary.substring(0, maxLength) + '...';
+    }
+    
+    console.log(`[Task ${taskId}] Using summary length: ${processedSummary.length} chars for ${mode} mode`);
+
     // 生成主要 ListenHub Podcast
     console.log(`[Task ${taskId}] Generating main ListenHub podcast with mode: ${mode}...`);
     await updateProgress({
@@ -789,7 +805,7 @@ async function processPodcastTask(
       message: '正在生成主要 Podcast 音檔...',
     });
     
-    const podcastEpisode = await generateChinesePodcast(result.summary, mode, customVoices);
+    const podcastEpisode = await generateChinesePodcast(processedSummary, mode, customVoices);
     
     console.log(`[Task ${taskId}] Main podcast generated: ${podcastEpisode.audioUrl}`);
 
@@ -809,13 +825,16 @@ async function processPodcastTask(
       } catch (error) {
         console.error(`[Task ${taskId}] Failed to generate outro audio:`, error);
         // 如果結尾生成失敗，繼續處理，但不使用結尾
-        processedOutroText = undefined;
+        outroEpisode = null;
       }
     }
 
-    // 如果有開場或結尾，合併音訊
+    // 如果有開場或結尾，合併音訊（確保等待所有音訊生成完成）
     let finalAudioUrl = podcastEpisode.audioUrl;
-    if (introEpisode?.audioUrl || outroEpisode?.audioUrl) {
+    const hasIntro = introEpisode?.audioUrl;
+    const hasOutro = outroEpisode?.audioUrl;
+    
+    if (hasIntro || hasOutro) {
       console.log(`[Task ${taskId}] Merging audio segments...`);
       await updateProgress({
         taskId,
