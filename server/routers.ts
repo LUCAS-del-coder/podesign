@@ -158,9 +158,11 @@ export const appRouter = router({
         voiceId2: z.string().optional(),
         mode: z.enum(['quick', 'medium', 'deep']).optional(),
         style: z.enum(['educational', 'casual', 'professional']).optional(),
+        introText: z.string().optional(), // 開場白文字（選填）
+        outroText: z.string().optional(), // 結尾語文字（選填）
       }))
       .mutation(async ({ input, ctx }) => {
-        const { youtubeUrl, textContent, articleUrl, inputType, voiceId1, voiceId2, mode, style } = input;
+        const { youtubeUrl, textContent, articleUrl, inputType, voiceId1, voiceId2, mode, style, introText, outroText } = input;
         
         // 驗證輸入
         let inputContent = "";
@@ -200,9 +202,17 @@ export const appRouter = router({
           userId: ctx.user.id,
           youtubeUrl: urlToStore,
           status: 'pending',
+          introText: introText?.trim() || null, // 儲存開場白文字（如果提供）
+          outroText: outroText?.trim() || null, // 儲存結尾語文字（如果提供）
         });
         
         console.log(`[CreateTask] Task ${taskId} created successfully with URL: ${urlToStore}`);
+        if (introText) {
+          console.log(`[CreateTask] Intro text provided: ${introText.substring(0, 50)}...`);
+        }
+        if (outroText) {
+          console.log(`[CreateTask] Outro text provided: ${outroText.substring(0, 50)}...`);
+        }
 
         // 儲存使用者的聲音偏好（如果有提供）
         if (voiceId1 && voiceId2) {
@@ -213,7 +223,7 @@ export const appRouter = router({
         }
 
         // 在背景處理任務（不阻塞回應）
-        processPodcastTask(taskId, inputContent, mode || 'medium', voiceId1, voiceId2, inputType, style || 'casual').catch((error) => {
+        processPodcastTask(taskId, inputContent, mode || 'medium', voiceId1, voiceId2, inputType, style || 'casual', introText?.trim(), outroText?.trim()).catch((error) => {
           console.error(`Task ${taskId} processing failed:`, error);
         });
 
@@ -601,7 +611,9 @@ async function processPodcastTask(
   voiceId1?: string,
   voiceId2?: string,
   inputType: 'youtube' | 'text' | 'article' = 'youtube',
-  style: 'educational' | 'casual' | 'professional' = 'casual'
+  style: 'educational' | 'casual' | 'professional' = 'casual',
+  introText?: string,
+  outroText?: string
 ) {
   try {
     // 導入進度更新服務
@@ -732,21 +744,122 @@ async function processPodcastTask(
       }
     }
 
-    // 生成 ListenHub Podcast
-    console.log(`[Task ${taskId}] Generating ListenHub podcast with mode: ${mode}...`);
-    await updateProgress({
-      taskId,
-      stage: 'generating',
-      percent: 70,
-      message: '正在生成 Podcast 音檔...',
-    });
     const customVoices = finalVoiceId1 && finalVoiceId2
       ? { host1: finalVoiceId1, host2: finalVoiceId2 }
       : undefined;
+
+    // 處理模板變數替換
+    const { replaceTemplateVariables, formatDate, formatDuration } = await import('./services/templateService');
+    const templateVars = {
+      date: formatDate(),
+      topic: result.title || result.summary?.substring(0, 50) || '本期內容',
+      title: result.title || '本期 Podcast',
+      duration: formatDuration(result.duration || 0),
+    };
+
+    let processedIntroText = introText ? replaceTemplateVariables(introText, templateVars) : undefined;
+    let processedOutroText = outroText ? replaceTemplateVariables(outroText, templateVars) : undefined;
+
+    // 生成開場音訊（如果有提供開場文字）
+    let introEpisode: { audioUrl?: string } | null = null;
+    if (processedIntroText) {
+      console.log(`[Task ${taskId}] Generating intro audio...`);
+      await updateProgress({
+        taskId,
+        stage: 'generating',
+        percent: 65,
+        message: '正在生成開場音訊...',
+      });
+      try {
+        introEpisode = await generateChinesePodcast(processedIntroText, 'quick', customVoices);
+        console.log(`[Task ${taskId}] Intro audio generated: ${introEpisode.audioUrl}`);
+      } catch (error) {
+        console.error(`[Task ${taskId}] Failed to generate intro audio:`, error);
+        // 如果開場生成失敗，繼續處理主要內容，但不使用開場
+        processedIntroText = undefined;
+      }
+    }
+
+    // 生成主要 ListenHub Podcast
+    console.log(`[Task ${taskId}] Generating main ListenHub podcast with mode: ${mode}...`);
+    await updateProgress({
+      taskId,
+      stage: 'generating',
+      percent: 75,
+      message: '正在生成主要 Podcast 音檔...',
+    });
     
     const podcastEpisode = await generateChinesePodcast(result.summary, mode, customVoices);
     
-    console.log(`[Task ${taskId}] Podcast generated: ${podcastEpisode.audioUrl}`);
+    console.log(`[Task ${taskId}] Main podcast generated: ${podcastEpisode.audioUrl}`);
+
+    // 生成結尾音訊（如果有提供結尾文字）
+    let outroEpisode: { audioUrl?: string } | null = null;
+    if (processedOutroText) {
+      console.log(`[Task ${taskId}] Generating outro audio...`);
+      await updateProgress({
+        taskId,
+        stage: 'generating',
+        percent: 85,
+        message: '正在生成結尾音訊...',
+      });
+      try {
+        outroEpisode = await generateChinesePodcast(processedOutroText, 'quick', customVoices);
+        console.log(`[Task ${taskId}] Outro audio generated: ${outroEpisode.audioUrl}`);
+      } catch (error) {
+        console.error(`[Task ${taskId}] Failed to generate outro audio:`, error);
+        // 如果結尾生成失敗，繼續處理，但不使用結尾
+        processedOutroText = undefined;
+      }
+    }
+
+    // 如果有開場或結尾，合併音訊
+    let finalAudioUrl = podcastEpisode.audioUrl;
+    if (introEpisode?.audioUrl || outroEpisode?.audioUrl) {
+      console.log(`[Task ${taskId}] Merging audio segments...`);
+      await updateProgress({
+        taskId,
+        stage: 'generating',
+        percent: 90,
+        message: '正在合併音訊片段...',
+      });
+
+      try {
+        const { mergePodcastAudio } = await import('./services/audioMergeService');
+        const { storagePut } = await import('./storage');
+        const fs = await import('fs/promises');
+
+        // 合併音訊
+        const mergedAudioPath = await mergePodcastAudio(
+          introEpisode?.audioUrl,
+          podcastEpisode.audioUrl,
+          outroEpisode?.audioUrl
+        );
+
+        // 讀取合併後的音訊檔案
+        const mergedAudioBuffer = await fs.readFile(mergedAudioPath);
+
+        // 上傳到存儲
+        const timestamp = Date.now();
+        const randomSuffix = Math.random().toString(36).substring(7);
+        const fileKey = `podcasts/${task.userId}/${taskId}/merged_${timestamp}_${randomSuffix}.mp3`;
+        const { url } = await storagePut(fileKey, mergedAudioBuffer, 'audio/mpeg');
+
+        finalAudioUrl = url;
+        console.log(`[Task ${taskId}] Merged audio uploaded: ${finalAudioUrl}`);
+
+        // 清理臨時檔案
+        try {
+          await fs.unlink(mergedAudioPath);
+        } catch (error) {
+          console.warn(`[Task ${taskId}] Failed to clean up merged audio file:`, error);
+        }
+      } catch (error) {
+        console.error(`[Task ${taskId}] Failed to merge audio:`, error);
+        // 如果合併失敗，使用主要 podcast 音訊
+        console.warn(`[Task ${taskId}] Using main podcast audio only due to merge failure`);
+      }
+    }
 
     // 更新任務結果
     await updateProgress({
@@ -764,7 +877,7 @@ async function processPodcastTask(
       audioUrl: result.audioUrl,
       audioFileKey: result.audioFileKey,
       listenHubEpisodeId: podcastEpisode.episodeId,
-      podcastAudioUrl: podcastEpisode.audioUrl || null,
+      podcastAudioUrl: finalAudioUrl || null, // 使用合併後的音訊 URL（如果有的話）
       podcastTitle: podcastEpisode.title || null,
       podcastScripts: podcastEpisode.scripts ? JSON.stringify(podcastEpisode.scripts) : null,
     });

@@ -28,6 +28,8 @@ export default function Home() {
   const [host2Voice, setHost2Voice] = useState<string>("");
   const [playingVoice, setPlayingVoice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [introText, setIntroText] = useState<string>("");
+  const [outroText, setOutroText] = useState<string>("");
   const [videoInfo, setVideoInfo] = useState<{
     title: string;
     duration: number;
@@ -65,6 +67,8 @@ export default function Home() {
       setYoutubeUrl("");
       setTextContent("");
       setArticleUrl("");
+      setIntroText("");
+      setOutroText("");
     },
     onError: (error) => {
       toast.error(`建立任務失敗：${error.message}`);
@@ -141,6 +145,8 @@ export default function Home() {
       voiceId2: host2Voice || undefined,
       mode,
       style,
+      introText: introText.trim() || undefined,
+      outroText: outroText.trim() || undefined,
     });
   };
 
@@ -433,6 +439,47 @@ export default function Home() {
                       </Button>
                     )}
                   </div>
+                </div>
+              </div>
+
+              {/* Intro and Outro Text Inputs */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="intro-text">開場白文字（選填）</Label>
+                  <Textarea
+                    id="intro-text"
+                    placeholder="例如：歡迎收聽 {date} 的節目，今天我們要討論 {topic}。支援變數：{date}、{topic}、{title}、{duration}"
+                    value={introText}
+                    onChange={(e) => setIntroText(e.target.value)}
+                    rows={3}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    開場白將在主要內容之前播放。可使用變數：{" "}
+                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{date}`}</code>、{" "}
+                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{topic}`}</code>、{" "}
+                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{title}`}</code>、{" "}
+                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{duration}`}</code>
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="outro-text">結尾語文字（選填）</Label>
+                  <Textarea
+                    id="outro-text"
+                    placeholder="例如：感謝收聽，我們下次見！"
+                    value={outroText}
+                    onChange={(e) => setOutroText(e.target.value)}
+                    rows={3}
+                    className="resize-none"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    結尾語將在主要內容之後播放。可使用變數：{" "}
+                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{date}`}</code>、{" "}
+                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{topic}`}</code>、{" "}
+                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{title}`}</code>、{" "}
+                    <code className="px-1 py-0.5 bg-muted rounded text-xs">{`{duration}`}</code>
+                  </p>
                 </div>
               </div>
 

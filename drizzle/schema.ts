@@ -69,6 +69,10 @@ export const podcastTasks = mysqlTable("podcast_tasks", {
   podcastTitle: text("podcast_title"), // ListenHub 生成的標題
   podcastScripts: text("podcast_scripts"), // ListenHub 生成的對話腳本 (JSON)
   
+  // 客製化開場和結尾
+  introText: text("intro_text"), // 開場白文字（選填）
+  outroText: text("outro_text"), // 結尾語文字（選填）
+  
   // 錯誤訊息
   errorMessage: text("error_message"),
   
