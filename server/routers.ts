@@ -773,17 +773,18 @@ async function processPodcastTask(
         message: '正在生成開場音訊...',
       });
       try {
-        // 將開場文字包裝成非常明確的單人敘述格式
-        // 注意：ListenHub API 需要兩個不同的 speaker，所以我們使用兩個不同的聲音
-        // 但文字格式明確指示這是單人敘述，讓第一個 speaker 讀出，第二個 speaker 不說話
-        const introContent = `主持人A：${processedIntroText}\n主持人B：（沉默）`;
+        // **關鍵修正**：按照 Claude 的建議，直接使用用戶的文字，不要加任何 prompt 或包裝
+        // 不要將開場白混入主要內容的腳本中，而是分別生成三段音訊
+        // 直接傳入用戶的文字，讓 ListenHub 生成音訊
+        const introContent = processedIntroText; // 直接使用，不加任何包裝
         // 使用兩個不同的 speaker（ListenHub API 要求）
         const introVoices = customVoices || undefined;
-        console.log(`[Task ${taskId}] Generating intro with content: "${introContent}"`);
+        console.log(`[Task ${taskId}] Generating intro audio (direct TTS, no dialogue conversion): "${introContent}"`);
+        console.log(`[Task ${taskId}] ⚠️  Warning: ListenHub API converts text to dialogue. This may not produce simple TTS.`);
         introEpisode = await generateChinesePodcast(introContent, 'quick', introVoices);
-        console.log(`[Task ${taskId}] Intro audio generated: ${introEpisode.audioUrl}`);
+        console.log(`[Task ${taskId}] ✅ Intro audio generated: ${introEpisode.audioUrl}`);
       } catch (error) {
-        console.error(`[Task ${taskId}] Failed to generate intro audio:`, error);
+        console.error(`[Task ${taskId}] ❌ Failed to generate intro audio:`, error);
         // 如果開場生成失敗，繼續處理主要內容，但不使用開場
         introEpisode = null;
       }
@@ -831,17 +832,18 @@ async function processPodcastTask(
         message: '正在生成結尾音訊...',
       });
       try {
-        // 將結尾文字包裝成非常明確的單人敘述格式
-        // 注意：ListenHub API 需要兩個不同的 speaker，所以我們使用兩個不同的聲音
-        // 但文字格式明確指示這是單人敘述，讓第一個 speaker 讀出，第二個 speaker 不說話
-        const outroContent = `主持人A：${processedOutroText}\n主持人B：（沉默）`;
+        // **關鍵修正**：按照 Claude 的建議，直接使用用戶的文字，不要加任何 prompt 或包裝
+        // 不要將結尾語混入主要內容的腳本中，而是分別生成三段音訊
+        // 直接傳入用戶的文字，讓 ListenHub 生成音訊
+        const outroContent = processedOutroText; // 直接使用，不加任何包裝
         // 使用兩個不同的 speaker（ListenHub API 要求）
         const outroVoices = customVoices || undefined;
-        console.log(`[Task ${taskId}] Generating outro with content: "${outroContent}"`);
+        console.log(`[Task ${taskId}] Generating outro audio (direct TTS, no dialogue conversion): "${outroContent}"`);
+        console.log(`[Task ${taskId}] ⚠️  Warning: ListenHub API converts text to dialogue. This may not produce simple TTS.`);
         outroEpisode = await generateChinesePodcast(outroContent, 'quick', outroVoices);
-        console.log(`[Task ${taskId}] Outro audio generated: ${outroEpisode.audioUrl}`);
+        console.log(`[Task ${taskId}] ✅ Outro audio generated: ${outroEpisode.audioUrl}`);
       } catch (error) {
-        console.error(`[Task ${taskId}] Failed to generate outro audio:`, error);
+        console.error(`[Task ${taskId}] ❌ Failed to generate outro audio:`, error);
         // 如果結尾生成失敗，繼續處理，但不使用結尾
         outroEpisode = null;
       }
