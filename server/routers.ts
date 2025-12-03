@@ -773,16 +773,40 @@ async function processPodcastTask(
         message: '正在生成開場音訊...',
       });
       try {
-        // **關鍵修正**：按照 Claude 的建議，直接使用用戶的文字，不要加任何 prompt 或包裝
-        // 不要將開場白混入主要內容的腳本中，而是分別生成三段音訊
-        // 直接傳入用戶的文字，讓 ListenHub 生成音訊
-        const introContent = processedIntroText; // 直接使用，不加任何包裝
-        // 使用兩個不同的 speaker（ListenHub API 要求）
-        const introVoices = customVoices || undefined;
-        console.log(`[Task ${taskId}] Generating intro audio (direct TTS, no dialogue conversion): "${introContent}"`);
-        console.log(`[Task ${taskId}] ⚠️  Warning: ListenHub API converts text to dialogue. This may not produce simple TTS.`);
-        introEpisode = await generateChinesePodcast(introContent, 'quick', introVoices);
-        console.log(`[Task ${taskId}] ✅ Intro audio generated: ${introEpisode.audioUrl}`);
+        // **嘗試使用 FlowSpeech API**：如果可用，使用 FlowSpeech 生成簡單的 TTS（直接讀出文字）
+        // 否則回退到使用 podcast API（會轉換成對話）
+        try {
+          const { generateFlowSpeech } = await import('./services/flowSpeechService');
+          const { selectMaleFemaleSpeakers } = await import('./listenHubService');
+          
+          // 獲取 speaker ID
+          let speakerId: string;
+          if (customVoices?.host1) {
+            speakerId = customVoices.host1;
+          } else {
+            const speakers = await selectMaleFemaleSpeakers();
+            speakerId = speakers.male.speakerId;
+          }
+          
+          console.log(`[Task ${taskId}] Attempting to use FlowSpeech API for intro (speaker: ${speakerId})...`);
+          const flowSpeechResult = await generateFlowSpeech(processedIntroText, speakerId, 'zh');
+          
+          if (flowSpeechResult.audioUrl) {
+            console.log(`[Task ${taskId}] ✅ Intro audio generated using FlowSpeech: ${flowSpeechResult.audioUrl}`);
+            introEpisode = { audioUrl: flowSpeechResult.audioUrl };
+          } else {
+            throw new Error("FlowSpeech API returned no audio URL");
+          }
+        } catch (flowSpeechError) {
+          console.log(`[Task ${taskId}] FlowSpeech API not available, falling back to podcast API:`, flowSpeechError instanceof Error ? flowSpeechError.message : String(flowSpeechError));
+          
+          // 回退到使用 podcast API
+          const introContent = processedIntroText; // 直接使用，不加任何包裝
+          const introVoices = customVoices || undefined;
+          console.log(`[Task ${taskId}] Generating intro audio using podcast API (may convert to dialogue): "${introContent}"`);
+          introEpisode = await generateChinesePodcast(introContent, 'quick', introVoices);
+          console.log(`[Task ${taskId}] ✅ Intro audio generated: ${introEpisode.audioUrl}`);
+        }
       } catch (error) {
         console.error(`[Task ${taskId}] ❌ Failed to generate intro audio:`, error);
         // 如果開場生成失敗，繼續處理主要內容，但不使用開場
@@ -832,16 +856,33 @@ async function processPodcastTask(
         message: '正在生成結尾音訊...',
       });
       try {
-        // **關鍵修正**：按照 Claude 的建議，直接使用用戶的文字，不要加任何 prompt 或包裝
-        // 不要將結尾語混入主要內容的腳本中，而是分別生成三段音訊
-        // 直接傳入用戶的文字，讓 ListenHub 生成音訊
-        const outroContent = processedOutroText; // 直接使用，不加任何包裝
-        // 使用兩個不同的 speaker（ListenHub API 要求）
-        const outroVoices = customVoices || undefined;
-        console.log(`[Task ${taskId}] Generating outro audio (direct TTS, no dialogue conversion): "${outroContent}"`);
-        console.log(`[Task ${taskId}] ⚠️  Warning: ListenHub API converts text to dialogue. This may not produce simple TTS.`);
-        outroEpisode = await generateChinesePodcast(outroContent, 'quick', outroVoices);
-        console.log(`[Task ${taskId}] ✅ Outro audio generated: ${outroEpisode.audioUrl}`);
+        // **嘗試使用 FlowSpeech API**：如果可用，使用 FlowSpeech 生成簡單的 TTS（直接讀出文字）
+        // 否則回退到使用 podcast API（會轉換成對話）
+        try {
+          const { generateFlowSpeech } = await import('./services/flowSpeechService');
+          const { selectMaleFemaleSpeakers } = await import('./listenHubService');
+          const speakers = await selectMaleFemaleSpeakers();
+          const speakerId = customVoices?.host1 || speakers.male.speakerId;
+          
+          console.log(`[Task ${taskId}] Attempting to use FlowSpeech API for outro...`);
+          const flowSpeechResult = await generateFlowSpeech(processedOutroText, speakerId, 'zh');
+          
+          if (flowSpeechResult.audioUrl) {
+            console.log(`[Task ${taskId}] ✅ Outro audio generated using FlowSpeech: ${flowSpeechResult.audioUrl}`);
+            outroEpisode = { audioUrl: flowSpeechResult.audioUrl };
+          } else {
+            throw new Error("FlowSpeech API returned no audio URL");
+          }
+        } catch (flowSpeechError) {
+          console.log(`[Task ${taskId}] FlowSpeech API not available, falling back to podcast API:`, flowSpeechError instanceof Error ? flowSpeechError.message : String(flowSpeechError));
+          
+          // 回退到使用 podcast API
+          const outroContent = processedOutroText; // 直接使用，不加任何包裝
+          const outroVoices = customVoices || undefined;
+          console.log(`[Task ${taskId}] Generating outro audio using podcast API (may convert to dialogue): "${outroContent}"`);
+          outroEpisode = await generateChinesePodcast(outroContent, 'quick', outroVoices);
+          console.log(`[Task ${taskId}] ✅ Outro audio generated: ${outroEpisode.audioUrl}`);
+        }
       } catch (error) {
         console.error(`[Task ${taskId}] ❌ Failed to generate outro audio:`, error);
         // 如果結尾生成失敗，繼續處理，但不使用結尾
