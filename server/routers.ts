@@ -774,13 +774,11 @@ async function processPodcastTask(
       });
       try {
         // 將開場文字包裝成非常明確的單人敘述格式
-        // 使用非常簡潔的格式，明確指示這是單人敘述，不要轉換成對話
-        // 嘗試使用"旁白："或"主持人獨白："的格式
-        const introContent = `旁白：${processedIntroText}`;
-        // 使用單一 speaker（只使用第一個聲音）來生成開場
-        const introVoices = customVoices 
-          ? { host1: customVoices.host1, host2: customVoices.host1 } // 使用同一個聲音
-          : undefined;
+        // 注意：ListenHub API 需要兩個不同的 speaker，所以我們使用兩個不同的聲音
+        // 但文字格式明確指示這是單人敘述，讓第一個 speaker 讀出，第二個 speaker 不說話
+        const introContent = `主持人A：${processedIntroText}\n主持人B：（沉默）`;
+        // 使用兩個不同的 speaker（ListenHub API 要求）
+        const introVoices = customVoices || undefined;
         console.log(`[Task ${taskId}] Generating intro with content: "${introContent}"`);
         introEpisode = await generateChinesePodcast(introContent, 'quick', introVoices);
         console.log(`[Task ${taskId}] Intro audio generated: ${introEpisode.audioUrl}`);
@@ -834,13 +832,11 @@ async function processPodcastTask(
       });
       try {
         // 將結尾文字包裝成非常明確的單人敘述格式
-        // 使用非常簡潔的格式，明確指示這是單人敘述，不要轉換成對話
-        // 嘗試使用"旁白："或"主持人獨白："的格式
-        const outroContent = `旁白：${processedOutroText}`;
-        // 使用單一 speaker（只使用第一個聲音）來生成結尾
-        const outroVoices = customVoices 
-          ? { host1: customVoices.host1, host2: customVoices.host1 } // 使用同一個聲音
-          : undefined;
+        // 注意：ListenHub API 需要兩個不同的 speaker，所以我們使用兩個不同的聲音
+        // 但文字格式明確指示這是單人敘述，讓第一個 speaker 讀出，第二個 speaker 不說話
+        const outroContent = `主持人A：${processedOutroText}\n主持人B：（沉默）`;
+        // 使用兩個不同的 speaker（ListenHub API 要求）
+        const outroVoices = customVoices || undefined;
         console.log(`[Task ${taskId}] Generating outro with content: "${outroContent}"`);
         outroEpisode = await generateChinesePodcast(outroContent, 'quick', outroVoices);
         console.log(`[Task ${taskId}] Outro audio generated: ${outroEpisode.audioUrl}`);
