@@ -415,30 +415,66 @@ export async function generateDirectNarration(
       speakers: [{ speakerId }],
       format: "narration" as const,
     },
-    // 策略 4-8: 使用 prompt 工程（如果 FlowSpeech 參數不支持）
+    // 策略 4-10: 使用更激進的 prompt 工程
     {
-      name: "策略4：單一 speaker + 簡單旁白標記",
+      name: "策略4：單一 speaker + 旁白標記",
       query: `旁白：${text}`,
       speakers: [{ speakerId }],
     },
     {
-      name: "策略5：兩個相同 speaker + 明確指示",
-      query: `【單人旁白模式】\n\n${text}\n\n【注意：這只是旁白，不要轉換成對話，不要讓兩個 speaker 互相對話】`,
+      name: "策略5：兩個相同 speaker + 極明確指示（第一個說話，第二個沉默）",
+      query: `【重要指令：這是單人旁白，不是對話】
+【規則：只有第一個 speaker 說話，第二個 speaker 完全沉默，不要有任何對話】
+【模式：旁白模式，直接讀出文字，不要轉換成對話格式】
+
+${text}
+
+【再次確認：這是旁白，不是對話，只有第一個 speaker 說話】`,
       speakers: [{ speakerId }, { speakerId }],
     },
     {
-      name: "策略6：引號包裝 + 明確指令",
-      query: `請直接讀出以下引號內的文字，不要添加任何對話元素，不要轉換成對話格式：\n\n"${text}"`,
+      name: "策略6：使用「我」的第一人稱格式",
+      query: `我：${text}`,
+      speakers: [{ speakerId }],
+    },
+    {
+      name: "策略7：使用「敘述者：」格式",
+      query: `敘述者：${text}`,
+      speakers: [{ speakerId }],
+    },
+    {
+      name: "策略8：引號包裝 + 極明確指令",
+      query: `【旁白指令：直接讀出以下引號內的文字，不要添加任何對話元素，不要轉換成對話格式，不要讓兩個 speaker 互相對話，只讓第一個 speaker 讀出】
+
+"${text}"
+
+【確認：這是旁白，不是對話】`,
       speakers: [{ speakerId }, { speakerId }],
     },
     {
-      name: "策略7：特殊格式標記",
-      query: `[NARRATION_MODE]\n${text}\n[/NARRATION_MODE]\n\n這是旁白模式，請直接讀出上述文字，不要轉換成對話。`,
+      name: "策略9：使用特殊標記 + 明確指令",
+      query: `[NARRATION_ONLY_MODE]
+[SPEAKER_1_ONLY]
+[NO_DIALOGUE]
+
+${text}
+
+[/NARRATION_ONLY_MODE]
+[確認：只有第一個 speaker 說話，第二個 speaker 完全沉默]`,
       speakers: [{ speakerId }, { speakerId }],
     },
     {
-      name: "策略8：詳細指令",
-      query: `【旁白模式：直接讀出以下文字，不要轉換成對話格式，不要添加任何對話元素，不要讓兩個 speaker 互相對話，只讓第一個 speaker 以旁白形式讀出以下文字】：\n\n${text}`,
+      name: "策略10：最詳細的指令",
+      query: `【旁白模式：直接讀出以下文字】
+【重要：不要轉換成對話格式】
+【重要：不要添加任何對話元素】
+【重要：不要讓兩個 speaker 互相對話】
+【重要：只讓第一個 speaker 以旁白形式讀出以下文字】
+【重要：第二個 speaker 完全沉默，不要說話】
+
+${text}
+
+【最終確認：這是旁白，不是對話，只有第一個 speaker 說話】`,
       speakers: [{ speakerId }, { speakerId }],
     },
   ];
