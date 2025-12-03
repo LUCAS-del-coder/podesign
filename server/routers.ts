@@ -798,13 +798,23 @@ async function processPodcastTask(
             throw new Error("FlowSpeech API returned no audio URL");
           }
         } catch (flowSpeechError) {
-          console.log(`[Task ${taskId}] FlowSpeech API not available, falling back to podcast API:`, flowSpeechError instanceof Error ? flowSpeechError.message : String(flowSpeechError));
+          console.log(`[Task ${taskId}] FlowSpeech API not available, falling back to direct narration:`, flowSpeechError instanceof Error ? flowSpeechError.message : String(flowSpeechError));
           
-          // 回退到使用 podcast API
-          const introContent = processedIntroText; // 直接使用，不加任何包裝
-          const introVoices = customVoices || undefined;
-          console.log(`[Task ${taskId}] Generating intro audio using podcast API (may convert to dialogue): "${introContent}"`);
-          introEpisode = await generateChinesePodcast(introContent, 'quick', introVoices);
+          // 回退到使用直接敘述模式（單一 speaker，明確指示直接讀出文字）
+          const { generateDirectNarration } = await import('./listenHubService');
+          const { selectMaleFemaleSpeakers } = await import('./listenHubService');
+          
+          // 獲取單一 speaker ID
+          let narrationSpeakerId: string;
+          if (customVoices?.host1) {
+            narrationSpeakerId = customVoices.host1;
+          } else {
+            const speakers = await selectMaleFemaleSpeakers();
+            narrationSpeakerId = speakers.male.speakerId;
+          }
+          
+          console.log(`[Task ${taskId}] Generating intro audio using direct narration mode (speaker: ${narrationSpeakerId}): "${processedIntroText.substring(0, 50)}..."`);
+          introEpisode = await generateDirectNarration(processedIntroText, narrationSpeakerId);
           console.log(`[Task ${taskId}] ✅ Intro audio generated: ${introEpisode.audioUrl}`);
         }
       } catch (error) {
@@ -874,13 +884,23 @@ async function processPodcastTask(
             throw new Error("FlowSpeech API returned no audio URL");
           }
         } catch (flowSpeechError) {
-          console.log(`[Task ${taskId}] FlowSpeech API not available, falling back to podcast API:`, flowSpeechError instanceof Error ? flowSpeechError.message : String(flowSpeechError));
+          console.log(`[Task ${taskId}] FlowSpeech API not available, falling back to direct narration:`, flowSpeechError instanceof Error ? flowSpeechError.message : String(flowSpeechError));
           
-          // 回退到使用 podcast API
-          const outroContent = processedOutroText; // 直接使用，不加任何包裝
-          const outroVoices = customVoices || undefined;
-          console.log(`[Task ${taskId}] Generating outro audio using podcast API (may convert to dialogue): "${outroContent}"`);
-          outroEpisode = await generateChinesePodcast(outroContent, 'quick', outroVoices);
+          // 回退到使用直接敘述模式（單一 speaker，明確指示直接讀出文字）
+          const { generateDirectNarration } = await import('./listenHubService');
+          const { selectMaleFemaleSpeakers } = await import('./listenHubService');
+          
+          // 獲取單一 speaker ID
+          let narrationSpeakerId: string;
+          if (customVoices?.host1) {
+            narrationSpeakerId = customVoices.host1;
+          } else {
+            const speakers = await selectMaleFemaleSpeakers();
+            narrationSpeakerId = speakers.male.speakerId;
+          }
+          
+          console.log(`[Task ${taskId}] Generating outro audio using direct narration mode (speaker: ${narrationSpeakerId}): "${processedOutroText.substring(0, 50)}..."`);
+          outroEpisode = await generateDirectNarration(processedOutroText, narrationSpeakerId);
           console.log(`[Task ${taskId}] ✅ Outro audio generated: ${outroEpisode.audioUrl}`);
         }
       } catch (error) {

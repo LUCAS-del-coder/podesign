@@ -27,16 +27,26 @@ export async function generateFlowSpeech(
     throw new Error("ListenHub API Key not configured");
   }
 
-  // 嘗試多個可能的 FlowSpeech API 端點
+  // 嘗試多個可能的 FlowSpeech API 端點和參數組合
   const possibleEndpoints = [
+    // 策略 1: 獨立的 FlowSpeech 端點
     { path: "/flowspeech/generate", body: { text, speakerId, language } },
     { path: "/flowspeech/create", body: { text, speakerId, language } },
     { path: "/flowspeech/tts", body: { text, speakerId, language } },
     { path: "/tts/flowspeech", body: { text, speakerId, language } },
     { path: "/tts/generate", body: { text, speakerId, language } },
     { path: "/flowspeech", body: { text, speakerId, language } },
-    // 嘗試使用 podcast 端點但使用單一 speaker
+    
+    // 策略 2: 使用 podcast/episodes 端點，但添加 type 參數
+    { path: "/podcast/episodes", body: { query: text, speakers: [{ speakerId }], language, mode: "quick", type: "flowspeech" } },
+    { path: "/podcast/episodes", body: { query: text, speakers: [{ speakerId }], language, mode: "quick", format: "flowspeech" } },
+    { path: "/podcast/episodes", body: { query: text, speakers: [{ speakerId }], language, mode: "quick", format: "narration" } },
+    
+    // 策略 3: 使用 podcast/episodes 端點，單一 speaker（可能自動使用 FlowSpeech）
     { path: "/podcast/episodes", body: { query: text, speakers: [{ speakerId }], language, mode: "quick" } },
+    
+    // 策略 4: 嘗試使用單一 speaker + 特殊標記
+    { path: "/podcast/episodes", body: { query: `[FLOWSPEECH]${text}[/FLOWSPEECH]`, speakers: [{ speakerId }], language, mode: "quick" } },
   ];
 
   let lastError: Error | null = null;

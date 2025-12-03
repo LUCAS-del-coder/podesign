@@ -23,6 +23,8 @@ export interface CreatePodcastRequest {
   speakers: Array<{ speakerId: string }>;
   language: "zh" | "en";
   mode: "quick" | "deep" | "debate";
+  type?: "podcast" | "flowspeech" | "narration"; // 可能的類型參數
+  format?: "dialogue" | "narration" | "flowspeech"; // 可能的格式參數
 }
 
 export interface PodcastEpisode {
@@ -368,4 +370,121 @@ export async function generateChinesePodcast(
   const episode = await waitForPodcastCompletion(episodeId);
 
   return episode;
+}
+
+/**
+ * 生成直接敘述音訊（直接讀出文字，不轉換成對話）
+ * 用於開場和結尾，確保文字被直接讀出而不被轉換成對話格式
+ * 
+ * 策略：嘗試多種 prompt 格式，找到最有效的方法
+ * 
+ * @param text 要讀出的文字
+ * @param speakerId 主要 speaker ID（會用於生成音訊）
+ * @returns 完成的 Episode（包含音檔 URL）
+ */
+export async function generateDirectNarration(
+  text: string,
+  speakerId: string
+): Promise<PodcastEpisode> {
+  if (!API_KEY) {
+    throw new Error("ListenHub API Key not configured");
+  }
+
+  console.log(`[ListenHub] Generating direct narration with speaker: ${speakerId}`);
+  console.log(`[ListenHub] Narration text (first 100 chars): ${text.substring(0, 100)}...`);
+
+  // 定義多種策略，按優先級排序
+  // 優先嘗試使用 FlowSpeech 參數（如果 API 支持）
+  const strategies = [
+    // 策略 1-3: 嘗試使用 FlowSpeech 參數（如果 API 支持）
+    {
+      name: "策略1：單一 speaker + type=flowspeech",
+      query: text,
+      speakers: [{ speakerId }],
+      type: "flowspeech" as const,
+    },
+    {
+      name: "策略2：單一 speaker + format=flowspeech",
+      query: text,
+      speakers: [{ speakerId }],
+      format: "flowspeech" as const,
+    },
+    {
+      name: "策略3：單一 speaker + format=narration",
+      query: text,
+      speakers: [{ speakerId }],
+      format: "narration" as const,
+    },
+    // 策略 4-8: 使用 prompt 工程（如果 FlowSpeech 參數不支持）
+    {
+      name: "策略4：單一 speaker + 簡單旁白標記",
+      query: `旁白：${text}`,
+      speakers: [{ speakerId }],
+    },
+    {
+      name: "策略5：兩個相同 speaker + 明確指示",
+      query: `【單人旁白模式】\n\n${text}\n\n【注意：這只是旁白，不要轉換成對話，不要讓兩個 speaker 互相對話】`,
+      speakers: [{ speakerId }, { speakerId }],
+    },
+    {
+      name: "策略6：引號包裝 + 明確指令",
+      query: `請直接讀出以下引號內的文字，不要添加任何對話元素，不要轉換成對話格式：\n\n"${text}"`,
+      speakers: [{ speakerId }, { speakerId }],
+    },
+    {
+      name: "策略7：特殊格式標記",
+      query: `[NARRATION_MODE]\n${text}\n[/NARRATION_MODE]\n\n這是旁白模式，請直接讀出上述文字，不要轉換成對話。`,
+      speakers: [{ speakerId }, { speakerId }],
+    },
+    {
+      name: "策略8：詳細指令",
+      query: `【旁白模式：直接讀出以下文字，不要轉換成對話格式，不要添加任何對話元素，不要讓兩個 speaker 互相對話，只讓第一個 speaker 以旁白形式讀出以下文字】：\n\n${text}`,
+      speakers: [{ speakerId }, { speakerId }],
+    },
+  ];
+
+  // 嘗試每種策略，直到成功
+  let lastError: Error | null = null;
+  
+  for (const strategy of strategies) {
+    try {
+      console.log(`[ListenHub] Trying ${strategy.name}...`);
+      
+      // 構建請求，包含可能的 FlowSpeech 參數
+      const request: CreatePodcastRequest = {
+        query: strategy.query,
+        speakers: strategy.speakers,
+        language: "zh",
+        mode: "quick", // 使用 quick 模式以加快速度
+      };
+      
+      // 如果策略包含 type 或 format 參數，添加到請求中
+      if ('type' in strategy && strategy.type) {
+        request.type = strategy.type;
+      }
+      if ('format' in strategy && strategy.format) {
+        request.format = strategy.format;
+      }
+      
+      const episodeId = await createPodcastEpisode(request);
+
+      console.log(`[ListenHub] ✅ ${strategy.name} - Created episode: ${episodeId}`);
+
+      // 等待完成
+      const episode = await waitForPodcastCompletion(episodeId);
+      
+      console.log(`[ListenHub] ✅ ${strategy.name} - Episode completed successfully`);
+      return episode;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.log(`[ListenHub] ❌ ${strategy.name} failed: ${errorMsg}`);
+      lastError = error instanceof Error ? error : new Error(String(error));
+      // 繼續嘗試下一個策略
+    }
+  }
+
+  // 如果所有策略都失敗，拋出最後一個錯誤
+  throw new Error(
+    `All narration strategies failed. Last error: ${lastError?.message || "Unknown error"}`
+  );
 }
